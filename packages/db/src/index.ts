@@ -1,0 +1,30 @@
+export * from './schema/index.ts';
+export { getDb, getPlatformDb, closeDb, type Database } from './client.ts';
+export { withTenant, withUser, withoutTenant, type TenantTransaction } from './tenant.ts';
+export {
+  sql,
+  eq,
+  ne,
+  and,
+  or,
+  not,
+  inArray,
+  notInArray,
+  isNull,
+  isNotNull,
+  gt,
+  gte,
+  lt,
+  lte,
+  like,
+  ilike,
+  between,
+  asc,
+  desc,
+  count,
+  countDistinct,
+  sum,
+  avg,
+  max,
+  min,
+} from 'drizzle-orm';
