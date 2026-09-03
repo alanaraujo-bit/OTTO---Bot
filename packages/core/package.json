@@ -13,7 +13,8 @@
     "./queue": "./src/queue/index.ts",
     "./events": "./src/events/index.ts",
     "./audit": "./src/audit/index.ts",
-    "./usage": "./src/usage/index.ts"
+    "./usage": "./src/usage/index.ts",
+    "./metricas": "./src/metricas/index.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

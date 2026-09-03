@@ -1,39 +1,46 @@
 'use client';
 
-import { useState } from 'react';
+import { useActionState, useState } from 'react';
+import { useFormStatus } from 'react-dom';
 import { Eye, EyeOff } from 'lucide-react';
 import { Botao, Campo } from '@otto/ui';
+
+import { acaoEntrar, type EstadoEntrada } from './acoes.ts';
 
 /**
  * Formulário de acesso.
  *
- * A autenticação de verdade é a próxima fase. Aqui o formulário já é real —
- * validação, estados, acessibilidade — e o envio ainda não tem para onde ir;
- * por isso ele diz exatamente isso em vez de fingir que entrou. Nada neste
- * produto pode fingir funcionar.
+ * O botão lê `useFormStatus`, e não um estado próprio: assim ele acompanha o
+ * envio real da server action em vez de um cronômetro que pode dessincronizar.
  */
-export function FormularioEntrada() {
-  const [email, setEmail] = useState('');
-  const [senha, setSenha] = useState('');
-  const [verSenha, setVerSenha] = useState(false);
-  const [enviando, setEnviando] = useState(false);
-  const [erro, setErro] = useState<string | null>(null);
 
-  async function enviar(evento: React.FormEvent<HTMLFormElement>) {
-    evento.preventDefault();
-    setErro(null);
-    setEnviando(true);
-
-    // Sem endpoint ainda. Assim que a sessão existir, esta chamada substitui a
-    // espera — o resto do formulário permanece como está.
-    await new Promise((r) => setTimeout(r, 600));
-
-    setEnviando(false);
-    setErro('A autenticação ainda não está disponível. Esta tela é a próxima etapa da construção.');
-  }
+function BotaoEntrar({ habilitado }: { habilitado: boolean }) {
+  const { pending } = useFormStatus();
 
   return (
-    <form onSubmit={enviar} noValidate className="grid gap-4">
+    <Botao
+      type="submit"
+      variante="primaria"
+      larguraTotal
+      carregando={pending}
+      disabled={!habilitado}
+      className="mt-1"
+    >
+      {pending ? 'Entrando…' : 'Entrar'}
+    </Botao>
+  );
+}
+
+export function FormularioEntrada({ proximo }: { proximo?: string }) {
+  const [estado, agir] = useActionState<EstadoEntrada, FormData>(acaoEntrar, {});
+  const [email, setEmail] = useState(estado.email ?? '');
+  const [senha, setSenha] = useState('');
+  const [verSenha, setVerSenha] = useState(false);
+
+  return (
+    <form action={agir} noValidate className="grid gap-4">
+      {proximo && <input type="hidden" name="proximo" value={proximo} />}
+
       <Campo
         rotulo="E-mail"
         type="email"
@@ -62,33 +69,24 @@ export function FormularioEntrada() {
             tamanho="sm"
             aria-label={verSenha ? 'Ocultar senha' : 'Mostrar senha'}
             onClick={() => setVerSenha((v) => !v)}
-            // No celular ocupa a altura inteira do campo: um alvo de 36 px dentro
-            // de um campo de 44 px erra com o polegar.
+            // No celular ocupa quase a altura inteira do campo: um alvo de 36 px
+            // dentro de um campo de 44 px erra com o polegar.
             className="size-7 px-0 max-md:h-10 max-md:w-10"
             icone={verSenha ? <EyeOff strokeWidth={1.5} /> : <Eye strokeWidth={1.5} />}
           />
         }
       />
 
-      {erro && (
+      {estado.erro && (
         <p
           role="alert"
-          className="rounded-sm border border-linha-firme bg-atencao-suave px-3 py-2 text-xs text-atencao"
+          className="rounded-sm border border-falha/25 bg-falha-suave px-3 py-2 text-xs text-falha"
         >
-          {erro}
+          {estado.erro}
         </p>
       )}
 
-      <Botao
-        type="submit"
-        variante="primaria"
-        larguraTotal
-        carregando={enviando}
-        disabled={!email || !senha}
-        className="mt-1"
-      >
-        {enviando ? 'Entrando…' : 'Entrar'}
-      </Botao>
+      <BotaoEntrar habilitado={Boolean(email && senha)} />
     </form>
   );
 }

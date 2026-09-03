@@ -8,3 +8,6 @@
 {"quando":"2026-09-03T01:05:00.000Z","texto":"Contexto do produto e identidade visual definidos","detalhe":"PRODUCT.md e DESIGN.md: o mundo visual é instrumento de operação, neutros quentes, IBM Plex auto-hospedada"}
 {"quando":"2026-09-03T01:10:00.000Z","texto":"Design system e primeira tela no ar","detalhe":"Tokens, claro e escuro nativos, botão, campo, etiqueta, vazio, seletor de tema e tela de acesso"}
 {"quando":"2026-09-03T01:12:00.000Z","texto":"Três defeitos achados na inspeção visual","detalhe":"Tailwind ignorava o pacote de UI; contraste terciário reprovado nos dois temas; alvo de toque de 36px no celular"}
+{"quando":"2026-09-03T01:40:00.000Z","texto":"Autenticação real funcionando","detalhe":"Argon2id, sessão opaca revogável, papéis com verificação no servidor, resposta única para credencial errada"}
+{"quando":"2026-09-03T01:42:00.000Z","texto":"Console de pé com navegação desktop e celular","detalhe":"Barra lateral no desktop, barra inferior no celular — composições diferentes, não a mesma encolhida"}
+{"quando":"2026-09-03T01:45:00.000Z","texto":"Bug de RLS achado no login real","detalhe":"lerSessao consultava vínculos sem contexto de usuário; a política escondia tudo e a pessoa caía em 'sem empresa'"}

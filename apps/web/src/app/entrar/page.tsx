@@ -1,19 +1,30 @@
 import type { Metadata } from 'next';
-
-import { FormularioEntrada } from './formulario.tsx';
-import { Assinatura } from '@/componentes/assinatura.tsx';
+import { redirect } from 'next/navigation';
 import { SeletorTema } from '@otto/ui';
+
+import { Assinatura } from '@/componentes/assinatura.tsx';
+import { sessaoAtual } from '@/servidor/sessao.ts';
+import { FormularioEntrada } from './formulario.tsx';
 
 export const metadata: Metadata = { title: 'Entrar' };
 
 /**
  * Tela de acesso.
  *
- * A única superfície onde o produto pode respirar e se apresentar — e ainda
- * assim sóbria. Sem ilustração, sem promessa de marketing, sem coluna lateral
- * decorativa: quem chega aqui quer entrar, não ser convencido.
+ * A única superfície onde o produto se apresenta — e ainda assim sóbria. Sem
+ * ilustração, sem coluna lateral decorativa, sem promessa de marketing: quem
+ * chega aqui quer entrar, não ser convencido.
  */
-export default function PaginaEntrar() {
+export default async function PaginaEntrar({
+  searchParams,
+}: {
+  searchParams: Promise<{ proximo?: string }>;
+}) {
+  const { proximo } = await searchParams;
+
+  // Quem já tem sessão não vê o formulário.
+  if (await sessaoAtual()) redirect(proximo?.startsWith('/') ? proximo : '/');
+
   return (
     <main className="flex min-h-dvh flex-col">
       <div className="flex flex-1 items-center justify-center px-6 py-12">
@@ -25,12 +36,12 @@ export default function PaginaEntrar() {
             Acesse o painel de atendimento da sua empresa.
           </p>
 
-          <FormularioEntrada />
+          <FormularioEntrada proximo={proximo} />
         </div>
       </div>
 
-      <footer className="flex items-center justify-between gap-4 px-6 pb-6 area-segura-base">
-        <p className="text-2xs text-texto-3">
+      <footer className="area-segura-base flex items-center justify-between gap-4 px-6 pb-6">
+        <p className="max-w-[42ch] text-2xs text-texto-3">
           Precisa de acesso? Fale com quem administra a conta da sua empresa.
         </p>
         <SeletorTema />

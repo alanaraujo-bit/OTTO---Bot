@@ -19,15 +19,15 @@
       "id": "autenticacao",
       "nome": "Autenticação e sessão",
       "resumo": "Entrar, sessão revogável, seleção de empresa, papéis",
-      "estado": "em_andamento",
+      "estado": "concluida",
       "criterio": "Papel restringe de verdade no servidor, não apenas escondendo botão"
     },
     {
       "id": "espinha",
       "nome": "Espinha vertical",
       "resumo": "Webhook → conversa → Inbox → conhecimento → resposta → envio → custo",
-      "estado": "bloqueada",
-      "bloqueio": "Chave da OpenAI",
+      "estado": "em_andamento",
+      "bloqueio": "Chave da OpenAI (contornado com provedor determinístico)",
       "criterio": "Uma linha real em ai_runs com custo, modelo e latência reais"
     },
     {

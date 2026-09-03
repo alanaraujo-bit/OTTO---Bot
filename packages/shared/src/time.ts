@@ -69,6 +69,24 @@ export function partesLocais(instante: Date, fuso: string = FUSO_PADRAO): Partes
   };
 }
 
+/**
+ * Instante em que começou o dia local da empresa.
+ *
+ * Existe porque "conversas hoje" precisa bater com o que o dono viu na loja: às
+ * 21h em Canaã dos Carajás já é o dia seguinte em UTC, e agregar por data UTC
+ * jogaria as três últimas horas de movimento no dia errado.
+ *
+ * O truque: interpreta a meia-noite local como se fosse UTC, mede o quanto esse
+ * instante se desloca ao ser lido no fuso alvo, e corrige. Funciona também onde
+ * o deslocamento muda, porque a medição usa a própria data em questão.
+ */
+export function inicioDoDiaLocal(instante: Date, fuso: string = FUSO_PADRAO): Date {
+  const { dataISO } = partesLocais(instante, fuso);
+  const comoUtc = new Date(`${dataISO}T00:00:00Z`);
+  const lidoNoFuso = new Date(comoUtc.toLocaleString('en-US', { timeZone: fuso }));
+  return new Date(comoUtc.getTime() + (comoUtc.getTime() - lidoNoFuso.getTime()));
+}
+
 /** `"7:30"` ou `"21:00"` → minutos desde a meia-noite. Retorna null se malformado. */
 export function horaParaMinutos(hora: string): number | null {
   const m = /^(\d{1,2}):(\d{2})$/.exec(hora.trim());
