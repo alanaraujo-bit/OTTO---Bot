@@ -1,0 +1,795 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Otto · Painel de construção</title>
+    <style>
+      /*
+        Direção visual provisória do produto, exercitada aqui primeiro.
+        Neutros levemente quentes, um único acento, tipografia carregando a
+        hierarquia. Sem gradiente, sem sombra decorativa, sem canto exagerado.
+      */
+      :root {
+        color-scheme: light dark;
+
+        --fundo: #faf9f7;
+        --superficie: #ffffff;
+        --superficie-2: #f4f3f0;
+        --texto: #1b1a18;
+        --texto-2: #56544e;
+        --texto-3: #8a877f;
+        --linha: #e5e3dd;
+        --linha-forte: #d5d2ca;
+
+        --ok: #146b52;
+        --ok-fundo: #e6f2ee;
+        --atencao: #8a5300;
+        --atencao-fundo: #f8efe0;
+        --falha: #a32b21;
+        --falha-fundo: #f9ebe9;
+        --acento: #1f5f8b;
+
+        --raio: 6px;
+        --fonte: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
+          Arial, sans-serif;
+        --mono: ui-monospace, "SF Mono", "Cascadia Mono", "Segoe UI Mono", Menlo, Consolas,
+          monospace;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --fundo: #121211;
+          --superficie: #191918;
+          --superficie-2: #1f1f1d;
+          --texto: #eceae6;
+          --texto-2: #a5a29b;
+          --texto-3: #78756e;
+          --linha: #2a2a27;
+          --linha-forte: #3a3935;
+
+          --ok: #4fbf95;
+          --ok-fundo: #14261f;
+          --atencao: #d9a253;
+          --atencao-fundo: #2a2115;
+          --falha: #e8776b;
+          --falha-fundo: #2c1917;
+          --acento: #6fa8cf;
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        -webkit-text-size-adjust: 100%;
+      }
+
+      body {
+        margin: 0;
+        background: var(--fundo);
+        color: var(--texto);
+        font-family: var(--fonte);
+        font-size: 13.5px;
+        line-height: 1.55;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      .envoltorio {
+        max-width: 1140px;
+        margin: 0 auto;
+        padding: 0 24px 72px;
+      }
+
+      /* ── Cabeçalho ───────────────────────────────────────────────────────── */
+
+      header {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        background: color-mix(in srgb, var(--fundo) 88%, transparent);
+        backdrop-filter: blur(8px);
+        border-bottom: 1px solid var(--linha);
+        padding: 14px 0 13px;
+        margin-bottom: 28px;
+      }
+
+      .cabecalho-conteudo {
+        max-width: 1140px;
+        margin: 0 auto;
+        padding: 0 24px;
+        display: flex;
+        align-items: baseline;
+        gap: 14px;
+        flex-wrap: wrap;
+      }
+
+      .marca {
+        font-size: 15px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+      }
+
+      .marca span {
+        color: var(--texto-3);
+        font-weight: 400;
+      }
+
+      .ambiente {
+        font-size: 10.5px;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        color: var(--texto-2);
+        border: 1px solid var(--linha-forte);
+        border-radius: 3px;
+        padding: 1px 6px;
+        align-self: center;
+      }
+
+      .conexao {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        font-size: 12px;
+        color: var(--texto-2);
+      }
+
+      .ponto {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--ok);
+        flex: none;
+      }
+
+      .ponto.vivo {
+        animation: pulsar 2.4s ease-in-out infinite;
+      }
+
+      .ponto.morto {
+        background: var(--falha);
+        animation: none;
+      }
+
+      @keyframes pulsar {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.35;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .ponto.vivo {
+          animation: none;
+        }
+      }
+
+      /* ── Estrutura ───────────────────────────────────────────────────────── */
+
+      .colunas {
+        display: grid;
+        grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
+        gap: 40px;
+        align-items: start;
+      }
+
+      @media (max-width: 900px) {
+        .colunas {
+          grid-template-columns: 1fr;
+          gap: 32px;
+        }
+        .envoltorio {
+          padding: 0 18px 56px;
+        }
+        .cabecalho-conteudo {
+          padding: 0 18px;
+        }
+      }
+
+      section + section {
+        margin-top: 34px;
+      }
+
+      h2 {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.09em;
+        color: var(--texto-3);
+        font-weight: 600;
+        margin: 0 0 12px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      h2::after {
+        content: '';
+        flex: 1;
+        height: 1px;
+        background: var(--linha);
+      }
+
+      /* ── Pendências ──────────────────────────────────────────────────────── */
+
+      .pendencia {
+        border: 1px solid var(--linha-forte);
+        border-left: 2px solid var(--atencao);
+        border-radius: var(--raio);
+        background: var(--superficie);
+        padding: 14px 16px;
+        margin-bottom: 10px;
+      }
+
+      .pendencia.atendida {
+        border-left-color: var(--ok);
+        opacity: 0.62;
+      }
+
+      .pendencia h3 {
+        margin: 0 0 6px;
+        font-size: 13.5px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .pendencia p {
+        margin: 0 0 8px;
+        color: var(--texto-2);
+        max-width: 62ch;
+      }
+
+      .passos {
+        display: grid;
+        gap: 3px;
+        font-size: 12.5px;
+      }
+
+      .passos div {
+        display: grid;
+        grid-template-columns: 78px 1fr;
+        gap: 10px;
+      }
+
+      .passos dt {
+        color: var(--texto-3);
+      }
+
+      .passos b {
+        color: var(--texto-3);
+        font-weight: 500;
+      }
+
+      /* ── Fases ───────────────────────────────────────────────────────────── */
+
+      .fases {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+
+      .fase {
+        display: grid;
+        grid-template-columns: 16px 1fr;
+        gap: 12px;
+        padding: 9px 0;
+        border-bottom: 1px solid var(--linha);
+      }
+
+      .fase:last-child {
+        border-bottom: 0;
+      }
+
+      .marcador {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        border: 1.5px solid var(--linha-forte);
+        margin-top: 6px;
+        justify-self: center;
+        flex: none;
+      }
+
+      .fase.concluida .marcador {
+        background: var(--ok);
+        border-color: var(--ok);
+      }
+
+      .fase.em_andamento .marcador {
+        border-color: var(--acento);
+        background: var(--acento);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--acento) 22%, transparent);
+      }
+
+      .fase.bloqueada .marcador {
+        border-color: var(--atencao);
+        background: var(--atencao-fundo);
+      }
+
+      .fase-nome {
+        font-weight: 550;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .fase.concluida .fase-nome {
+        color: var(--texto-2);
+      }
+
+      .fase-resumo {
+        color: var(--texto-3);
+        font-size: 12.5px;
+      }
+
+      .fase-criterio {
+        font-size: 12px;
+        color: var(--texto-3);
+        margin-top: 4px;
+        padding-left: 10px;
+        border-left: 1px solid var(--linha);
+      }
+
+      .fase-criterio b {
+        color: var(--texto-2);
+        font-weight: 500;
+      }
+
+      /* ── Etiquetas ───────────────────────────────────────────────────────── */
+
+      .etiqueta {
+        font-size: 10.5px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        padding: 1px 6px;
+        border-radius: 3px;
+        font-weight: 600;
+        white-space: nowrap;
+      }
+
+      .etiqueta.ok {
+        color: var(--ok);
+        background: var(--ok-fundo);
+      }
+
+      .etiqueta.andamento {
+        color: var(--acento);
+        background: color-mix(in srgb, var(--acento) 14%, transparent);
+      }
+
+      .etiqueta.atencao {
+        color: var(--atencao);
+        background: var(--atencao-fundo);
+      }
+
+      .etiqueta.falha {
+        color: var(--falha);
+        background: var(--falha-fundo);
+      }
+
+      .etiqueta.neutra {
+        color: var(--texto-3);
+        background: var(--superficie-2);
+      }
+
+      /* ── Painéis laterais ────────────────────────────────────────────────── */
+
+      .bloco {
+        border: 1px solid var(--linha);
+        border-radius: var(--raio);
+        background: var(--superficie);
+        overflow: hidden;
+      }
+
+      .linha {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 9px 14px;
+        border-bottom: 1px solid var(--linha);
+      }
+
+      .linha:last-child {
+        border-bottom: 0;
+      }
+
+      .linha dt {
+        color: var(--texto-2);
+        flex: none;
+      }
+
+      .linha dd {
+        margin: 0 0 0 auto;
+        font-variant-numeric: tabular-nums;
+        text-align: right;
+      }
+
+      .valor-mudou {
+        animation: destacar 1.1s ease-out;
+      }
+
+      @keyframes destacar {
+        0% {
+          background: color-mix(in srgb, var(--acento) 26%, transparent);
+        }
+        100% {
+          background: transparent;
+        }
+      }
+
+      .detalhe {
+        color: var(--texto-3);
+        font-size: 12px;
+      }
+
+      .mono {
+        font-family: var(--mono);
+        font-size: 11.5px;
+      }
+
+      /* ── Commits e atividade ─────────────────────────────────────────────── */
+
+      .lista {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+
+      .item {
+        padding: 8px 0;
+        border-bottom: 1px solid var(--linha);
+        display: grid;
+        gap: 2px;
+      }
+
+      .item:last-child {
+        border-bottom: 0;
+      }
+
+      .item-topo {
+        display: flex;
+        gap: 10px;
+        align-items: baseline;
+      }
+
+      .item-topo .quando {
+        margin-left: auto;
+        color: var(--texto-3);
+        font-size: 11.5px;
+        white-space: nowrap;
+        flex: none;
+      }
+
+      .hash {
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--texto-3);
+        flex: none;
+      }
+
+      /* ── Botão ───────────────────────────────────────────────────────────── */
+
+      button {
+        font: inherit;
+        font-size: 12px;
+        color: var(--texto);
+        background: var(--superficie);
+        border: 1px solid var(--linha-forte);
+        border-radius: 4px;
+        padding: 3px 10px;
+        cursor: pointer;
+        transition: background 0.12s ease, border-color 0.12s ease;
+      }
+
+      button:hover:not(:disabled) {
+        background: var(--superficie-2);
+        border-color: var(--texto-3);
+      }
+
+      button:disabled {
+        opacity: 0.5;
+        cursor: default;
+      }
+
+      button:focus-visible {
+        outline: 2px solid var(--acento);
+        outline-offset: 2px;
+      }
+
+      .vazio {
+        color: var(--texto-3);
+        font-size: 12.5px;
+        padding: 10px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="cabecalho-conteudo">
+        <div class="marca">Otto <span>· painel de construção</span></div>
+        <div class="ambiente" id="ambiente">—</div>
+        <div class="conexao">
+          <span class="ponto" id="ponto"></span>
+          <span id="conexao-texto">conectando…</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="envoltorio">
+      <section id="secao-pendencias" hidden>
+        <h2>Depende de você</h2>
+        <div id="pendencias"></div>
+      </section>
+
+      <div class="colunas">
+        <div>
+          <section>
+            <h2>Fases</h2>
+            <ul class="fases" id="fases"></ul>
+          </section>
+
+          <section>
+            <h2>Commits</h2>
+            <ul class="lista" id="commits"></ul>
+          </section>
+        </div>
+
+        <div>
+          <section>
+            <h2>Infraestrutura</h2>
+            <div class="bloco" id="infra"></div>
+          </section>
+
+          <section>
+            <h2>
+              Testes
+              <button id="rodar" type="button">rodar agora</button>
+            </h2>
+            <div class="bloco" id="testes"></div>
+          </section>
+
+          <section>
+            <h2>Código</h2>
+            <div class="bloco" id="codigo"></div>
+          </section>
+
+          <section>
+            <h2>Atividade</h2>
+            <ul class="lista" id="diario"></ul>
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <script type="module">
+      const $ = (id) => document.getElementById(id);
+      const relativo = new Intl.RelativeTimeFormat('pt-BR', { numeric: 'auto' });
+      const anteriores = new Map();
+
+      function quando(iso) {
+        if (!iso) return '—';
+        const s = Math.round((new Date(iso) - Date.now()) / 1000);
+        const a = Math.abs(s);
+        if (a < 45) return 'agora';
+        if (a < 3600) return relativo.format(Math.round(s / 60), 'minute');
+        if (a < 86400) return relativo.format(Math.round(s / 3600), 'hour');
+        return relativo.format(Math.round(s / 86400), 'day');
+      }
+
+      const esc = (t) =>
+        String(t ?? '').replace(
+          /[&<>"]/g,
+          (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c],
+        );
+
+      /** Realça um valor que acabou de mudar — em painel ao vivo, isso é a notícia. */
+      function linha(chave, rotulo, valor, detalhe) {
+        const mudou = anteriores.has(chave) && anteriores.get(chave) !== valor;
+        anteriores.set(chave, valor);
+        return `<div class="linha ${mudou ? 'valor-mudou' : ''}">
+          <dt>${esc(rotulo)}</dt>
+          ${detalhe ? `<span class="detalhe">${detalhe}</span>` : ''}
+          <dd>${valor}</dd>
+        </div>`;
+      }
+
+      const ETIQUETA_FASE = {
+        concluida: ['ok', 'concluída'],
+        em_andamento: ['andamento', 'em andamento'],
+        bloqueada: ['atencao', 'bloqueada'],
+        pendente: ['neutra', 'pendente'],
+      };
+
+      function desenhar(e) {
+        $('ambiente').textContent = e.projeto.ambiente;
+
+        // Pendências externas
+        const pendentes = e.pendencias.filter((p) => !p.atendida);
+        $('secao-pendencias').hidden = e.pendencias.length === 0;
+        $('pendencias').innerHTML = e.pendencias
+          .map(
+            (p) => `<article class="pendencia ${p.atendida ? 'atendida' : ''}">
+              <h3>${esc(p.titulo)}
+                <span class="etiqueta ${p.atendida ? 'ok' : 'atencao'}">${
+                  p.atendida ? 'recebido' : 'aguardando'
+                }</span>
+              </h3>
+              <p>${esc(p.porque)}</p>
+              <dl class="passos">
+                <div><dt>onde</dt><dd>${esc(p.onde)}</dd></div>
+                <div><dt>destino</dt><dd>${esc(p.destino)}</dd></div>
+                <div><dt>validação</dt><dd>${esc(p.validacao)}</dd></div>
+              </dl>
+            </article>`,
+          )
+          .join('');
+
+        // Fases
+        $('fases').innerHTML = e.fases
+          .map((f) => {
+            const [classe, texto] = ETIQUETA_FASE[f.estado] ?? ETIQUETA_FASE.pendente;
+            return `<li class="fase ${f.estado}">
+              <span class="marcador"></span>
+              <div>
+                <div class="fase-nome">${esc(f.nome)}
+                  <span class="etiqueta ${classe}">${texto}</span>
+                  ${f.bloqueio ? `<span class="etiqueta neutra">${esc(f.bloqueio)}</span>` : ''}
+                </div>
+                <div class="fase-resumo">${esc(f.resumo)}</div>
+                ${
+                  f.estado === 'em_andamento' || f.estado === 'concluida'
+                    ? `<div class="fase-criterio"><b>Critério:</b> ${esc(f.criterio)}</div>`
+                    : ''
+                }
+              </div>
+            </li>`;
+          })
+          .join('');
+
+        // Infraestrutura
+        const pg = e.infra.postgres;
+        const rd = e.infra.redis;
+        $('infra').innerHTML = [
+          linha(
+            'pg',
+            'Postgres',
+            pg.ok
+              ? `<span class="etiqueta ok">no ar</span>`
+              : `<span class="etiqueta falha">fora</span>`,
+            pg.ok ? `${pg.versao} · ${pg.latenciaMs} ms` : esc(pg.detalhe),
+          ),
+          pg.ok ? linha('mig', 'Migrações aplicadas', pg.migracoes) : '',
+          pg.ok
+            ? linha(
+                'tab',
+                'Tabelas com RLS',
+                `${pg.tabelasProtegidas} de ${pg.tabelas}`,
+                'isolamento',
+              )
+            : '',
+          linha(
+            'redis',
+            'Redis',
+            rd.ok
+              ? `<span class="etiqueta ok">no ar</span>`
+              : `<span class="etiqueta falha">fora</span>`,
+            rd.ok ? `${rd.latenciaMs} ms` : esc(rd.detalhe),
+          ),
+        ]
+          .filter(Boolean)
+          .join('');
+
+        // Testes
+        const t = e.testes;
+        const rodando = t.estado === 'rodando';
+        $('rodar').disabled = rodando;
+        $('rodar').textContent = rodando ? 'rodando…' : 'rodar agora';
+
+        const etiquetaTeste = {
+          passou: `<span class="etiqueta ok">passaram</span>`,
+          falhou: `<span class="etiqueta falha">falharam</span>`,
+          rodando: `<span class="etiqueta andamento">rodando</span>`,
+          nunca: `<span class="etiqueta neutra">sem execução</span>`,
+        }[t.estado];
+
+        $('testes').innerHTML = [
+          linha('teste-estado', 'Situação', etiquetaTeste, t.quando ? quando(t.quando) : ''),
+          t.total != null
+            ? linha('teste-total', 'Testes', `${t.passaram} / ${t.total}`, 'isolamento multiempresa')
+            : '',
+          t.duracaoMs ? linha('teste-dur', 'Duração', `${(t.duracaoMs / 1000).toFixed(1)} s`) : '',
+          t.detalhe ? `<div class="linha"><span class="detalhe">${esc(t.detalhe)}</span></div>` : '',
+        ]
+          .filter(Boolean)
+          .join('');
+
+        // Código
+        const total = Object.values(e.codigo).reduce((a, b) => a + b, 0);
+        $('codigo').innerHTML = [
+          linha('loc', 'Linhas escritas', total.toLocaleString('pt-BR')),
+          linha('arq', 'Arquivos versionados', e.git.arquivosVersionados),
+          linha(
+            'sujo',
+            'Alterações não commitadas',
+            e.git.alteracoesPendentes,
+            e.git.alteracoesPendentes ? 'em andamento' : '',
+          ),
+          linha('ramo', 'Ramo', `<span class="mono">${esc(e.git.ramo)}</span>`),
+        ].join('');
+
+        // Commits
+        $('commits').innerHTML =
+          e.git.commits
+            .map(
+              (c) => `<li class="item">
+                <div class="item-topo">
+                  <span class="hash">${esc(c.hash)}</span>
+                  <span>${esc(c.assunto)}</span>
+                  <span class="quando">${quando(c.quando)}</span>
+                </div>
+              </li>`,
+            )
+            .join('') || '<li class="vazio">Nenhum commit ainda.</li>';
+
+        // Atividade
+        $('diario').innerHTML =
+          e.diario
+            .map(
+              (d) => `<li class="item">
+                <div class="item-topo">
+                  <span>${esc(d.texto)}</span>
+                  <span class="quando">${quando(d.quando)}</span>
+                </div>
+                ${d.detalhe ? `<div class="detalhe">${esc(d.detalhe)}</div>` : ''}
+              </li>`,
+            )
+            .join('') ||
+          '<li class="vazio">Sem anotações ainda. Cada passo relevante aparece aqui.</li>';
+      }
+
+      $('rodar').addEventListener('click', () => {
+        $('rodar').disabled = true;
+        fetch('/testes', { method: 'POST' }).catch(() => {});
+      });
+
+      let fonte;
+      function conectar() {
+        fonte = new EventSource('/eventos');
+
+        fonte.onopen = () => {
+          $('ponto').className = 'ponto vivo';
+          $('conexao-texto').textContent = 'ao vivo';
+        };
+
+        fonte.onmessage = (evento) => {
+          try {
+            desenhar(JSON.parse(evento.data));
+          } catch (erro) {
+            console.error('estado inválido', erro);
+          }
+        };
+
+        fonte.onerror = () => {
+          $('ponto').className = 'ponto morto';
+          $('conexao-texto').textContent = 'reconectando…';
+        };
+      }
+
+      conectar();
+
+      // Os carimbos são relativos: sem isso "há 2 min" congela na tela.
+      setInterval(() => {
+        document.querySelectorAll('.quando').forEach((n) => {
+          if (n.dataset.iso) n.textContent = quando(n.dataset.iso);
+        });
+      }, 30_000);
+    </script>
+  </body>
+</html>

@@ -1,0 +1,7 @@
+{"quando":"2026-09-02T23:55:00.000Z","texto":"Infraestrutura provisionada no Railway","detalhe":"Projeto otto, ambientes development e production, Postgres 18.6 e Redis"}
+{"quando":"2026-09-03T00:20:00.000Z","texto":"Extensões verificadas na instância real","detalhe":"pgvector 0.8.6, pg_trgm, unaccent, pgcrypto e configuração de busca em português"}
+{"quando":"2026-09-03T00:35:00.000Z","texto":"Domínio modelado","detalhe":"31 tabelas: empresas, unidades com horário, identidade, canais, contatos, conversas, conhecimento versionado, agente, custos e auditoria"}
+{"quando":"2026-09-03T00:41:00.000Z","texto":"Bug encontrado por teste: colunas colidindo","detalhe":"first_seen_at, received_at e occurred_at estavam todas mapeadas para created_at"}
+{"quando":"2026-09-03T00:42:00.000Z","texto":"Bug encontrado por teste: política de RLS lançava erro","detalhe":"current_setting devolve string vazia após o primeiro uso na conexão; corrigido com nullif em app_tenant_id()"}
+{"quando":"2026-09-03T00:44:00.000Z","texto":"Isolamento multiempresa provado","detalhe":"14 testes contra banco real: leitura e escrita cruzadas, junções, contexto de usuário e trava para tabela nova sem RLS"}
+{"quando":"2026-09-03T00:52:00.000Z","texto":"Painel de construção no ar","detalhe":"Lê banco, migrações, RLS, testes, commits e código — nada declarado sem fonte verificável"}

@@ -1,0 +1,148 @@
+{
+  "comentario": "Estado declarado da construção. Cada fase só muda para 'concluida' quando o critério do docs/ROADMAP.md é satisfeito e há teste ou inspeção visual que sustente. O painel cruza isto com sinais reais (banco, migrações, testes, commits).",
+  "fases": [
+    {
+      "id": "fundacao",
+      "nome": "Fundação técnica",
+      "resumo": "Infraestrutura, monorepo, schema, isolamento multiempresa por RLS",
+      "estado": "concluida",
+      "criterio": "Consulta sem contexto de empresa retorna zero linhas, comprovado por teste contra banco real"
+    },
+    {
+      "id": "identidade",
+      "nome": "Identidade visual e design system",
+      "resumo": "Tokens, tema claro e escuro, primitivos essenciais",
+      "estado": "em_andamento",
+      "criterio": "Login e shell do produto renderizados nos dois temas, sem componente construído sem tela que o use"
+    },
+    {
+      "id": "autenticacao",
+      "nome": "Autenticação e sessão",
+      "resumo": "Entrar, sessão revogável, seleção de empresa, papéis",
+      "estado": "pendente",
+      "criterio": "Papel restringe de verdade no servidor, não apenas escondendo botão"
+    },
+    {
+      "id": "espinha",
+      "nome": "Espinha vertical",
+      "resumo": "Webhook → conversa → Inbox → conhecimento → resposta → envio → custo",
+      "estado": "bloqueada",
+      "bloqueio": "Chave da OpenAI",
+      "criterio": "Uma linha real em ai_runs com custo, modelo e latência reais"
+    },
+    {
+      "id": "console",
+      "nome": "Console",
+      "resumo": "Shell, navegação, Home operacional, usuários e permissões",
+      "estado": "pendente",
+      "criterio": "O proprietário convida alguém e o papel efetivamente restringe"
+    },
+    {
+      "id": "inbox",
+      "nome": "Inbox",
+      "resumo": "Caixa unificada, modos automático/copilot/humano, handoff",
+      "estado": "pendente",
+      "criterio": "Operador assume pelo celular e o cliente não repete nada"
+    },
+    {
+      "id": "conhecimento",
+      "nome": "Centro de Conhecimento",
+      "resumo": "Categorias, versionamento, aprovação, conflitos, procedência",
+      "estado": "pendente",
+      "criterio": "Publicar um item muda a resposta do agente na conversa seguinte"
+    },
+    {
+      "id": "agente",
+      "nome": "Agente",
+      "resumo": "Comportamento em controles compreensíveis, versionado",
+      "estado": "pendente",
+      "criterio": "Mudar personalidade altera o estilo sem alterar os fatos"
+    },
+    {
+      "id": "aprendizado",
+      "nome": "Aprendizado",
+      "resumo": "Sinais, sugestões, revisão humana, publicação versionada",
+      "estado": "pendente",
+      "criterio": "Pergunta repetida sem resposta gera sugestão concreta"
+    },
+    {
+      "id": "operacao",
+      "nome": "Operação",
+      "resumo": "Casos e Kanban, notificações push, automações",
+      "estado": "pendente",
+      "criterio": "Reclamação vira caso e o gerente recebe alerta com o app fechado"
+    },
+    {
+      "id": "inteligencia",
+      "nome": "Analytics e custos",
+      "resumo": "Períodos, comparação, custo por conversa, drill-down",
+      "estado": "pendente",
+      "criterio": "Clicar em uma métrica abre exatamente as conversas que a originaram"
+    },
+    {
+      "id": "backoffice",
+      "nome": "Backoffice do SaaS",
+      "resumo": "Empresas, planos, limites, consumo, saúde, ações administrativas",
+      "estado": "pendente",
+      "criterio": "Operar o SaaS não exige mais editar o banco à mão"
+    },
+    {
+      "id": "canais",
+      "nome": "Canais reais",
+      "resumo": "WhatsApp e Instagram oficiais no nosso ambiente de teste",
+      "estado": "bloqueada",
+      "bloqueio": "App e verificação da Meta",
+      "criterio": "Mensagem de um celular real chega na Inbox e a resposta volta"
+    },
+    {
+      "id": "endurecimento",
+      "nome": "Endurecimento",
+      "resumo": "Segurança, LGPD, observabilidade, backups, performance, acessibilidade",
+      "estado": "pendente",
+      "criterio": "Backup restaurado em ambiente limpo e diagnóstico em uma tela só"
+    },
+    {
+      "id": "piloto",
+      "nome": "Piloto interno",
+      "resumo": "Uso real e continuado do nosso ambiente de teste",
+      "estado": "pendente",
+      "criterio": "Nenhum fluxo importante quebrado"
+    },
+    {
+      "id": "campeao",
+      "nome": "Supermercado Campeão",
+      "resumo": "Onboarding do primeiro cliente com dados reais",
+      "estado": "pendente",
+      "criterio": "Sr. Fernando controla o atendimento dele pelo celular"
+    }
+  ],
+  "pendenciasExternas": [
+    {
+      "id": "openai",
+      "titulo": "Chave da API da OpenAI",
+      "porque": "Sem ela a espinha vertical não fecha: o critério é uma linha real de custo em ai_runs, e isso não se simula.",
+      "onde": "platform.openai.com → API keys → Create new secret key",
+      "destino": "OPENAI_API_KEY no .env local e nas variáveis do Railway",
+      "validacao": "Rodo a espinha vertical e mostro a linha de custo",
+      "variavel": "OPENAI_API_KEY"
+    },
+    {
+      "id": "meta_app",
+      "titulo": "App da Meta e Verificação de Negócios",
+      "porque": "É o único prazo que não depende de código: a análise da Meta leva dias ou semanas. As demais fases não ficam bloqueadas por isso.",
+      "onde": "business.facebook.com (portfólio + submeter Verificação) → developers.facebook.com/apps (criar app, adicionar WhatsApp)",
+      "destino": "META_APP_SECRET e META_WEBHOOK_VERIFY_TOKEN",
+      "validacao": "O handshake do webhook devolve o desafio da Meta",
+      "variavel": "META_APP_SECRET"
+    },
+    {
+      "id": "meta_numero",
+      "titulo": "Número de teste do WhatsApp",
+      "porque": "Permite exercitar a cadeia inteira com a API oficial antes de qualquer aprovação, e sem tocar em nada do Sr. Fernando.",
+      "onde": "Painel do app → WhatsApp → API Setup (phone_number_id e token temporário)",
+      "destino": "Cadastrado como canal do ambiente de teste",
+      "validacao": "Mensagem enviada do seu celular aparece na Inbox",
+      "variavel": null
+    }
+  ]
+}
