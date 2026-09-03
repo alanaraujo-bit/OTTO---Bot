@@ -117,7 +117,35 @@ ou preparo uma planilha para ele preencher.
 
 ---
 
-## B6 · Primeiro deploy em produção — falta 1 clique no dashboard do Railway
+## ~~B6 · Primeiro deploy em produção~~ — RESOLVIDO (2026-09-03)
+
+Produção está no ar em **<https://web-production-1c38b.up.railway.app>**
+(`/api/saude` responde `{"ok":true,"banco":"ok"}`).
+
+O que foi feito, na ordem: o Alan executou o **Sync** no dashboard (o único
+passo sem API — ver o histórico abaixo); as variáveis de produção foram
+reconfiguradas, porque o Sync as sobrescreveu com as do `development`, inclusive
+os segredos, que os dois ambientes **não** podem compartilhar; o worker migrou o
+banco no arranque (papéis + migrações em 277 ms); o `web` subiu e ganhou
+domínio; e a primeira empresa foi provisionada.
+
+**Ficou uma dívida pequena, deliberada:** `SESSION_SECRET_PROD` e as
+`PROVISIONAR_*` continuam no serviço `worker` de produção. As `PROVISIONAR_*`
+podem ser apagadas assim que o login for confirmado — o script é inerte sem
+elas. `SESSION_SECRET_PROD` existe porque o Railway só resolve `${{secret()}}`
+na **criação** de uma variável, nunca na atualização: para trocar um segredo já
+existente é preciso criar uma variável nova e referenciá-la. Apagar a auxiliar
+depois quebraria a referência.
+
+**Nota de operação para o próximo ambiente:** o Sync do Railway copia as
+variáveis do ambiente de origem por cima das do destino. Depois de qualquer
+Sync, conferir `DATABASE_*`, `REDIS_URL`, `SESSION_SECRET` e `ENCRYPTION_KEY` —
+os nomes dos serviços de banco mudam entre ambientes (`postgres` vs
+`postgres-nm6t`) e as URLs quebram silenciosamente.
+
+---
+
+## Histórico · o passo do dashboard que não tem API
 
 Alvo decidido pelo Alan em 2026-09-03: **Railway, ambiente `production`.**
 
