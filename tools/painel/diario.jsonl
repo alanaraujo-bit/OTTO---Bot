@@ -11,3 +11,6 @@
 {"quando":"2026-09-03T01:40:00.000Z","texto":"Autenticação real funcionando","detalhe":"Argon2id, sessão opaca revogável, papéis com verificação no servidor, resposta única para credencial errada"}
 {"quando":"2026-09-03T01:42:00.000Z","texto":"Console de pé com navegação desktop e celular","detalhe":"Barra lateral no desktop, barra inferior no celular — composições diferentes, não a mesma encolhida"}
 {"quando":"2026-09-03T01:45:00.000Z","texto":"Bug de RLS achado no login real","detalhe":"lerSessao consultava vínculos sem contexto de usuário; a política escondia tudo e a pessoa caía em 'sem empresa'"}
+{"quando":"2026-09-03T02:00:00.000Z","texto":"Espinha vertical fechada e provada","detalhe":"Webhook → contato → conversa → recuperação no banco → agente → resposta → custo. 9 testes ponta a ponta contra Postgres real"}
+{"quando":"2026-09-03T02:05:00.000Z","texto":"Bug grave na busca: exigia todas as palavras","detalhe":"websearch_to_tsquery liga termos com E; 'vocês aceitam pix?' nunca casaria porque nenhum item contém 'vocês'"}
+{"quando":"2026-09-03T02:08:00.000Z","texto":"Bug grave: piso de escore descartava tudo","detalhe":"Piso de 0,02 acima do que a 1ª posição do RRF produz (0,0164). A busca achava e a recuperação devolvia vazio"}

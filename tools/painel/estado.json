@@ -26,9 +26,8 @@
       "id": "espinha",
       "nome": "Espinha vertical",
       "resumo": "Webhook → conversa → Inbox → conhecimento → resposta → envio → custo",
-      "estado": "em_andamento",
-      "bloqueio": "Chave da OpenAI (contornado com provedor determinístico)",
-      "criterio": "Uma linha real em ai_runs com custo, modelo e latência reais"
+      "estado": "concluida",
+      "criterio": "Cadeia completa provada por 9 testes contra banco real, com custo e desfecho registrados"
     },
     {
       "id": "console",
@@ -41,7 +40,7 @@
       "id": "inbox",
       "nome": "Inbox",
       "resumo": "Caixa unificada, modos automático/copilot/humano, handoff",
-      "estado": "pendente",
+      "estado": "em_andamento",
       "criterio": "Operador assume pelo celular e o cliente não repete nada"
     },
     {
