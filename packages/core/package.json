@@ -15,7 +15,9 @@
     "./audit": "./src/audit/index.ts",
     "./usage": "./src/usage/index.ts",
     "./metricas": "./src/metricas/index.ts",
-    "./aprendizado": "./src/aprendizado/index.ts"
+    "./aprendizado": "./src/aprendizado/index.ts",
+    "./contatos": "./src/contatos/index.ts",
+    "./plataforma": "./src/plataforma/index.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

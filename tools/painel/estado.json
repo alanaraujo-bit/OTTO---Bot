@@ -82,7 +82,7 @@
       "id": "backoffice",
       "nome": "Backoffice do SaaS",
       "resumo": "Empresas, planos, limites, consumo, saúde, ações administrativas",
-      "estado": "em_andamento",
+      "estado": "concluida",
       "criterio": "Operar o SaaS não exige mais editar o banco à mão"
     },
     {
@@ -97,7 +97,7 @@
       "id": "endurecimento",
       "nome": "Endurecimento",
       "resumo": "Segurança, LGPD, observabilidade, backups, performance, acessibilidade",
-      "estado": "pendente",
+      "estado": "em_andamento",
       "criterio": "Backup restaurado em ambiente limpo e diagnóstico em uma tela só"
     },
     {

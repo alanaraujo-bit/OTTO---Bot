@@ -25,3 +25,5 @@
 {"quando":"2026-09-03T03:32:00.000Z","texto":"Log de erro passou a dizer o que aconteceu","detalhe":"Registrava {code:interno,status:500} e nada mais; a causa raiz ficava invisível"}
 {"quando":"2026-09-03T03:40:00.000Z","texto":"Analytics com comparação e drill-down","detalhe":"Toda métrica leva às conversas que a originaram; gráfico em SVG sem biblioteca"}
 {"quando":"2026-09-03T03:45:00.000Z","texto":"Bug grave de fuso horário corrigido","detalhe":"O dia local retornava meia-noite UTC: toda métrica diária contava o dia errado. new Date(string) usa o fuso do processo"}
+{"quando":"2026-09-03T03:55:00.000Z","texto":"Backoffice do SaaS no ar","detalhe":"Alarmes primeiro; detectou 30 envios travados de verdade e o reenfileiramento entregou todos"}
+{"quando":"2026-09-03T04:00:00.000Z","texto":"Bug silencioso: subconsulta correlacionada sem tabela qualificada","detalhe":"Drizzle renderiza a coluna como \"id\"; a correlação não acontecia e o zero parecia 'sem dados ainda'"}

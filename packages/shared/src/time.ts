@@ -140,9 +140,18 @@ export function minutosParaHora(minutos: number): string {
 
 const RELATIVO = new Intl.RelativeTimeFormat('pt-BR', { numeric: 'auto' });
 
-/** "agora", "há 3 min", "há 2 h", "ontem". Para carimbo de conversa e lista. */
-export function tempoRelativo(instante: Date, agora: Date = new Date()): string {
-  const segundos = Math.round((instante.getTime() - agora.getTime()) / 1000);
+/**
+ * "agora", "há 3 min", "há 2 h", "ontem". Para carimbo de conversa e lista.
+ *
+ * Aceita string porque agregados de timestamp (`max`, `min`) voltam do driver
+ * como texto, não como `Date` — e um carimbo de data não deve derrubar a página
+ * inteira por causa disso.
+ */
+export function tempoRelativo(instante: Date | string, agora: Date = new Date()): string {
+  const data = instante instanceof Date ? instante : new Date(instante);
+  if (Number.isNaN(data.getTime())) return '—';
+
+  const segundos = Math.round((data.getTime() - agora.getTime()) / 1000);
   const abs = Math.abs(segundos);
 
   if (abs < 45) return 'agora';
