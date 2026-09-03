@@ -250,9 +250,7 @@ function fundir(
       tipo: e.linha.tipo,
       escore: e.escore,
       origem: (e.noTexto && e.noVetor ? 'ambos' : e.noTexto ? 'texto' : 'vetor') as
-        | 'texto'
-        | 'vetor'
-        | 'ambos',
+        'texto' | 'vetor' | 'ambos',
       cobertura:
         e.linha.termosTotal && e.linha.termosTotal > 0
           ? (e.linha.termosCasados ?? 0) / e.linha.termosTotal
@@ -286,10 +284,9 @@ export function temFundamento(trechos: TrechoRecuperado[]): boolean {
   const melhor = trechos[0];
   if (!melhor) return false;
 
-  // Corroboração pelos dois caminhos ainda exige um mínimo de correspondência
-  // real: o vetor sozinho sempre devolve o vizinho mais próximo, por pior que
-  // ele seja.
-  if (melhor.origem === 'ambos') return melhor.cobertura >= COBERTURA_MINIMA * 0.7;
-
+  // A busca vetorial pode corroborar a ordem, mas nunca reduz a evidência
+  // lexical exigida: ela sempre devolve algum vizinho, mesmo fora do assunto.
+  // Reduzir o piso quando os dois caminhos concordam transformava uma menção
+  // incidental em autorização para responder (a regressão de "vendem pneu?").
   return melhor.cobertura >= COBERTURA_MINIMA && melhor.escore >= escoreNaPosicao(2);
 }
