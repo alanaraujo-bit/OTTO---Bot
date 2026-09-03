@@ -3,9 +3,32 @@ export {
   type MensagemRecebida,
   type ResultadoIngestao,
 } from './ingestao.ts';
+
 export {
   atenderAutomaticamente,
   encaminharParaHumano,
   type MotivoHandoff,
   type ResultadoAtendimento,
 } from './atendimento.ts';
+
+export {
+  detalharConversa,
+  listarConversas,
+  marcarComoLida,
+  type DetalheConversa,
+  type FiltrosInbox,
+  type FiltroStatus,
+  type ItemInbox,
+  type MensagemDaConversa,
+} from './consultas.ts';
+
+export {
+  alterarModo,
+  assumirConversa,
+  devolverParaIA,
+  novaChaveDeEnvio,
+  resolverConversa,
+  responderComoOperador,
+} from './acoes.ts';
+
+export { ehViolacaoDeUnicidade } from './conflito.ts';

@@ -14,3 +14,8 @@
 {"quando":"2026-09-03T02:00:00.000Z","texto":"Espinha vertical fechada e provada","detalhe":"Webhook → contato → conversa → recuperação no banco → agente → resposta → custo. 9 testes ponta a ponta contra Postgres real"}
 {"quando":"2026-09-03T02:05:00.000Z","texto":"Bug grave na busca: exigia todas as palavras","detalhe":"websearch_to_tsquery liga termos com E; 'vocês aceitam pix?' nunca casaria porque nenhum item contém 'vocês'"}
 {"quando":"2026-09-03T02:08:00.000Z","texto":"Bug grave: piso de escore descartava tudo","detalhe":"Piso de 0,02 acima do que a 1ª posição do RRF produz (0,0164). A busca achava e a recuperação devolvia vazio"}
+{"quando":"2026-09-03T02:40:00.000Z","texto":"Inbox no ar com modos e handoff","detalhe":"Lista, conversa, assumir, devolver, responder, resolver — desktop e celular como composições próprias"}
+{"quando":"2026-09-03T02:45:00.000Z","texto":"Simulador de canal exercita a cadeia pela interface","detalhe":"Mesmo webhook, mesma deduplicação, mesmo agente — sem depender da Meta"}
+{"quando":"2026-09-03T02:50:00.000Z","texto":"Falha grave na regra anti-alucinação corrigida","detalhe":"'vendem pneu de caminhão?' recebia resposta sobre açougue. Agora mede cobertura de termos, não só posição"}
+{"quando":"2026-09-03T02:55:00.000Z","texto":"Instrução do sistema vazava como resposta ao cliente","detalhe":"O marcador por string colidia com a própria instrução; agora é estrutural"}
+{"quando":"2026-09-03T03:00:00.000Z","texto":"Horário e endereço passaram a ser fundamento válido","detalhe":"As perguntas mais comuns de um comércio iam todas para humano mesmo com o dado cadastrado"}

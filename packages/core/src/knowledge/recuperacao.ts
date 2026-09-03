@@ -24,10 +24,20 @@ export interface TrechoRecuperado {
   titulo: string;
   conteudo: string;
   tipo: string;
-  /** 0..1. Fusão dos dois caminhos, não a distância bruta de nenhum deles. */
+  /** Fusão dos dois caminhos, não a distância bruta de nenhum deles. */
   escore: number;
   /** Como este trecho chegou aqui. Aparece na auditoria da resposta. */
   origem: 'texto' | 'vetor' | 'ambos';
+  /**
+   * Fração dos termos significativos da pergunta presentes neste trecho (0..1).
+   *
+   * É a medida de qualidade **absoluta** da correspondência, e o `escore` não
+   * substitui: o RRF ordena, mas o primeiro colocado de uma busca ruim continua
+   * sendo o primeiro colocado. Sem esta fração, "vendem pneu de caminhão?"
+   * casava a palavra "vendem" com um item sobre padaria e o agente respondia
+   * sobre açougue — exatamente a alucinação que o produto existe para evitar.
+   */
+  cobertura: number;
 }
 
 export interface OpcoesRecuperacao {
@@ -90,6 +100,9 @@ interface LinhaBruta extends Record<string, unknown> {
   titulo: string;
   conteudo: string;
   tipo: string;
+  /** Quantos termos da pergunta este trecho contém, e quantos ela tinha. */
+  termosCasados?: number;
+  termosTotal?: number;
 }
 
 /**
@@ -131,10 +144,19 @@ async function buscaTextual(
       c.item_id      as "itemId",
       i.title        as "titulo",
       c.content      as "conteudo",
-      i.kind::text   as "tipo"
+      i.kind::text   as "tipo",
+      -- Quantos termos da pergunta este trecho de fato contém. É o que separa
+      -- "casou em uma palavra qualquer" de "responde a pergunta".
+      (
+        select count(*)::int
+        from unnest(t.lista) as termo
+        where c.content_tsv @@ to_tsquery('pt_unaccent', termo)
+      )              as "termosCasados",
+      cardinality(t.lista) as "termosTotal"
     from knowledge_chunks c
     join knowledge_items i on i.id = c.item_id
     cross join pergunta p
+    cross join termos t
     where i.status = 'publicado'
       and (i.valid_from is null or i.valid_from <= now())
       and (i.valid_until is null or i.valid_until >= now())
@@ -227,23 +249,47 @@ function fundir(
       conteudo: e.linha.conteudo,
       tipo: e.linha.tipo,
       escore: e.escore,
-      origem: e.noTexto && e.noVetor ? 'ambos' : e.noTexto ? 'texto' : 'vetor',
+      origem: (e.noTexto && e.noVetor ? 'ambos' : e.noTexto ? 'texto' : 'vetor') as
+        | 'texto'
+        | 'vetor'
+        | 'ambos',
+      cobertura:
+        e.linha.termosTotal && e.linha.termosTotal > 0
+          ? (e.linha.termosCasados ?? 0) / e.linha.termosTotal
+          : 0,
     }));
 }
+
+/**
+ * Cobertura mínima para uma resposta ser considerada fundamentada.
+ *
+ * Metade dos termos significativos da pergunta precisa estar no trecho. O valor
+ * vem do formato real das perguntas: "vocês aceitam pix?" tem três termos
+ * (`voc`, `aceit`, `pix`) e o item correto casa dois — enquanto "vendem pneu de
+ * caminhão?" casa apenas um de quatro contra qualquer item da base.
+ */
+const COBERTURA_MINIMA = 0.5;
 
 /**
  * Se o que foi recuperado sustenta uma resposta.
  *
  * Esta é a regra que impede a alucinação, e ela é **código**, não instrução de
- * prompt — um modelo pode ignorar instrução; não pode ignorar um `if`.
+ * prompt: um modelo pode ignorar instrução; não pode ignorar um `if`.
  *
- * O critério: existir ao menos um trecho, e o melhor deles ter chegado por
- * ambos os caminhos ou com folga clara sobre o piso. Um único acerto fraco de
- * texto costuma ser coincidência de palavra comum.
+ * O critério é de **qualidade absoluta**, não de posição. O RRF ordena bem, mas
+ * o primeiro colocado de uma busca ruim continua sendo o primeiro colocado — e
+ * como a busca textual liga os termos com OU, quase toda pergunta encontra
+ * alguma coisa. Sem a cobertura, "vendem pneu de caminhão?" casava a palavra
+ * "vendem" e o agente respondia sobre açougue e padaria.
  */
 export function temFundamento(trechos: TrechoRecuperado[]): boolean {
   const melhor = trechos[0];
   if (!melhor) return false;
-  if (melhor.origem === 'ambos') return true;
-  return melhor.escore >= escoreNaPosicao(2);
+
+  // Corroboração pelos dois caminhos ainda exige um mínimo de correspondência
+  // real: o vetor sozinho sempre devolve o vizinho mais próximo, por pior que
+  // ele seja.
+  if (melhor.origem === 'ambos') return melhor.cobertura >= COBERTURA_MINIMA * 0.7;
+
+  return melhor.cobertura >= COBERTURA_MINIMA && melhor.escore >= escoreNaPosicao(2);
 }

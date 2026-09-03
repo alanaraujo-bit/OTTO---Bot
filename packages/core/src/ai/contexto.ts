@@ -194,20 +194,54 @@ export async function contextoDaEmpresa(tenantId: string): Promise<ContextoEmpre
 }
 
 /**
- * Formata o conhecimento recuperado.
+ * Formata o fundamento da resposta.
  *
- * O marcador `CONHECIMENTO` é o que a instrução referencia como única fonte de
- * fato, e o que o provedor determinístico procura para derivar a resposta.
+ * Junta as duas fontes legítimas: o que foi recuperado da Base de Conhecimento e
+ * os fatos estruturados das unidades. Horário e endereço entram por aqui — e não
+ * apenas na instrução — porque são a resposta, não uma preferência de
+ * comportamento.
  */
-export function blocoDeConhecimento(trechos: TrechoRecuperado[]): string {
-  if (trechos.length === 0) {
+export function blocoDeConhecimento(
+  trechos: TrechoRecuperado[],
+  empresa?: ContextoEmpresa,
+  incluirUnidades = false,
+): string {
+  const partes: string[] = [];
+
+  if (incluirUnidades && empresa?.unidades.length) {
+    const unidades = empresa.unidades
+      .map((u) => {
+        // Os rótulos carregam as palavras que o cliente realmente usa — "abre",
+        // "fecha", "onde fica" — e não só o termo técnico. Isso ajuda qualquer
+        // modelo a ligar a pergunta ao fato certo, e é o que separa responder o
+        // horário de responder o endereço para quem perguntou que horas abre.
+        const linhas = [`${u.nome}`];
+        if (u.endereco) linhas.push(`Endereço, onde fica, localização: ${u.endereco}`);
+        if (u.telefone) linhas.push(`Telefone para contato: ${u.telefone}`);
+        if (u.horarioHoje) {
+          linhas.push(`Horário de hoje, que horas abre e fecha, funcionamento: ${u.horarioHoje}`);
+        }
+        if (u.abertoAgora !== null) {
+          linhas.push(u.abertoAgora ? 'Está aberta neste momento.' : 'Está fechada neste momento.');
+        }
+        return linhas.join('\n');
+      })
+      .join('\n---\n');
+
+    partes.push(unidades);
+  }
+
+  if (trechos.length > 0) {
+    partes.push(trechos.map((t) => t.conteudo.trim()).join('\n---\n'));
+  }
+
+  if (partes.length === 0) {
     return (
       'CONHECIMENTO\n' +
-      'Nada foi encontrado na base sobre esta pergunta. ' +
+      'Nada foi encontrado sobre esta pergunta. ' +
       'Você não sabe a resposta — diga isso com naturalidade e ofereça chamar a equipe.'
     );
   }
 
-  const corpo = trechos.map((t) => t.conteudo.trim()).join('\n---\n');
-  return `CONHECIMENTO\nInformação oficial da empresa. Responda apenas com base nisto.\n---\n${corpo}`;
+  return `CONHECIMENTO\nInformação oficial da empresa. Responda apenas com base nisto.\n---\n${partes.join('\n---\n')}`;
 }

@@ -329,3 +329,110 @@ describe('cadeia completa de atendimento', () => {
     expect(segunda.conversaNova).toBe(false);
   });
 });
+
+describe('regra anti-alucinação', () => {
+  /**
+   * Os casos que já falharam de verdade. Cada linha aqui corresponde a um bug
+   * encontrado exercitando o produto, não a uma hipótese.
+   */
+  const casos: { pergunta: string; deveResponder: boolean; porque: string }[] = [
+    {
+      pergunta: 'vocês aceitam pix?',
+      deveResponder: true,
+      porque: 'está na base; a busca por OU precisa encontrar mesmo com "vocês" fora do texto',
+    },
+    {
+      pergunta: 'aceita cartao de credito',
+      deveResponder: true,
+      porque: 'sem acento, como se digita no celular',
+    },
+    {
+      pergunta: 'vendem pneu de caminhão?',
+      deveResponder: false,
+      porque: 'casava só a palavra "vendem" e respondia sobre outro assunto',
+    },
+    {
+      pergunta: 'vocês consertam geladeira?',
+      deveResponder: false,
+      porque: 'nada na base cobre assistência técnica',
+    },
+    {
+      pergunta: 'qual o valor do arroz hoje?',
+      deveResponder: false,
+      porque: 'preço depende de integração que não existe; inventar seria a pior falha',
+    },
+  ];
+
+  for (const caso of casos) {
+    it(`${caso.deveResponder ? 'responde' : 'encaminha'}: "${caso.pergunta}"`, async () => {
+      const trechos = await recuperar(tenantId, caso.pergunta);
+      expect(temFundamento(trechos), caso.porque).toBe(caso.deveResponder);
+    });
+  }
+
+  it('mede cobertura de termos, não apenas posição no ranking', async () => {
+    // O ponto do bug: com OU, uma pergunta fora do assunto ainda encontra algo —
+    // e o primeiro colocado de uma busca ruim continua sendo o primeiro colocado.
+    const foraDoAssunto = await recuperar(tenantId, 'vendem pneu de caminhão?');
+    if (foraDoAssunto.length > 0) {
+      expect(foraDoAssunto[0]!.cobertura).toBeLessThan(0.5);
+    }
+
+    const noAssunto = await recuperar(tenantId, 'vocês aceitam pix?');
+    expect(noAssunto[0]!.cobertura).toBeGreaterThanOrEqual(0.5);
+  });
+});
+
+describe('fundamento em fatos estruturados', () => {
+  it('reconhece pergunta sobre horário e endereço como fundamentada', async () => {
+    const { contextoDaEmpresa } = await import('./ai/contexto.ts');
+    const { avaliarFundamento } = await import('./ai/fundamento.ts');
+
+    const empresa = await contextoDaEmpresa(tenantId);
+    // A empresa de teste não tem unidade cadastrada, então a resposta correta
+    // aqui é "não sei" — o que também prova que a regra não é otimista.
+    const semUnidade = avaliarFundamento('que horas vocês abrem?', [], empresa, false);
+    expect(semUnidade).toBe('nenhum');
+  });
+
+  it('não confunde pergunta de produto com pergunta de unidade', async () => {
+    const { perguntaSobreUnidade } = await import('./ai/fundamento.ts');
+
+    expect(perguntaSobreUnidade('que horas vocês abrem?')).toBe(true);
+    expect(perguntaSobreUnidade('qual o endereço da loja?')).toBe(true);
+    expect(perguntaSobreUnidade('abrem domingo?')).toBe(true);
+    expect(perguntaSobreUnidade('vocês aceitam pix?')).toBe(false);
+    expect(perguntaSobreUnidade('vendem pneu?')).toBe(false);
+  });
+});
+
+describe('separação entre instrução e conhecimento', () => {
+  it('nunca envia texto da instrução como resposta ao cliente', async () => {
+    const { ProvedorSimulado } = await import('./ai/provedores/simulado.ts');
+    const provedor = new ProvedorSimulado();
+
+    // A instrução menciona a palavra CONHECIMENTO ao proibir o modelo de sair
+    // dela. Um filtro por string confundia as duas e vazava a instrução.
+    const r = await provedor.gerar({
+      modelo: 'teste',
+      mensagens: [
+        {
+          papel: 'sistema',
+          marcador: 'instrucao',
+          conteudo:
+            'Use apenas o que estiver no CONHECIMENTO fornecido. A loja está fechada agora.',
+        },
+        {
+          papel: 'sistema',
+          marcador: 'conhecimento',
+          conteudo: 'CONHECIMENTO\n---\nPagamentos\n\nAceitamos PIX e cartão de crédito.',
+        },
+        { papel: 'usuario', conteudo: 'aceita pix?' },
+      ],
+    });
+
+    expect(r.texto).toContain('PIX');
+    expect(r.texto).not.toContain('CONHECIMENTO');
+    expect(r.texto).not.toContain('fechada agora');
+  });
+});

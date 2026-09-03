@@ -38,9 +38,12 @@ export class ProvedorSimulado implements Provedor {
     const ultimaDoCliente =
       [...pedido.mensagens].reverse().find((m) => m.papel === 'usuario')?.conteudo ?? '';
 
-    // O contexto recuperado chega como mensagem de sistema marcada.
+    // Pelo marcador estrutural, nunca pelo conteúdo: a instrução do agente
+    // menciona a palavra CONHECIMENTO ao proibir o modelo de sair dela, e um
+    // filtro por string chegou a mandar uma frase da instrução para o cliente
+    // como se fosse resposta.
     const fundamento = pedido.mensagens
-      .filter((m) => m.papel === 'sistema' && m.conteudo.includes('CONHECIMENTO'))
+      .filter((m) => m.marcador === 'conhecimento')
       .map((m) => m.conteudo)
       .join('\n');
 
@@ -107,40 +110,70 @@ function extrairTrechos(bloco: string): string[] {
     .filter((t) => t.length > 0 && !t.startsWith('CONHECIMENTO'));
 }
 
+const normalizar = (texto: string) =>
+  texto
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '');
+
 /**
  * Monta a resposta a partir do que foi recuperado.
  *
- * Pega a frase do trecho com mais palavras em comum com a pergunta. Grosseiro de
- * propósito: o objetivo é provar que a resposta veio do conhecimento da empresa,
- * não simular fluência.
+ * Escolhe a frase do conhecimento que mais responde à pergunta, e a pontuação
+ * pesa **raridade**: uma palavra que aparece em uma frase só vale muito mais que
+ * uma que aparece em todas.
+ *
+ * Sem isso, "vocês aceitam pix?" premiava qualquer frase com "aceitamos" — e o
+ * cliente que perguntou sobre PIX recebia a frase sobre vale-alimentação, porque
+ * as duas contêm o verbo. Grosseiro é aceitável aqui; errado não.
  */
 function responderCom(trechos: string[], pergunta: string): string {
-  const palavras = new Set(
-    pergunta
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[̀-ͯ]/g, '')
-      .split(/\W+/)
-      .filter((p) => p.length > 3),
-  );
+  const termos = [
+    ...new Set(normalizar(pergunta).split(/\W+/).filter((p) => p.length > 2)),
+  ];
 
-  const frases = trechos
-    .flatMap((t) => t.split('\n').slice(1).join(' ').split(/(?<=[.!?])\s+/))
-    .map((f) => f.trim())
-    .filter((f) => f.length > 20);
+  // Cada candidato é uma unidade de resposta independente: uma frase de um item
+  // de conhecimento, ou uma linha de fato de uma unidade ("Funcionamento hoje:
+  // 07:00 às 21:00"). Tratar o bloco inteiro como um texto só faria o cliente
+  // que perguntou o horário receber também endereço e telefone.
+  const frases = trechos.flatMap((trecho) => {
+    const linhas = trecho
+      .split('\n')
+      .map((l) => l.trim())
+      // Metadado de indexação, não resposta ao cliente.
+      .filter((l) => l && !/^\(também perguntado como:/i.test(l));
 
-  if (frases.length === 0) return trechos[0]!.split('\n').slice(1).join(' ').trim();
+    const [cabecalho, ...resto] = linhas;
+
+    return resto.flatMap((linha) =>
+      // Fato de unidade já é atômico; texto corrido precisa ser quebrado.
+      /^[A-ZÀ-Ú][a-zà-ú ]+:/.test(linha)
+        ? [`${cabecalho ? `${cabecalho} — ` : ''}${linha}`]
+        : linha.split(/(?<=[.!?])\s+/),
+    );
+  });
+
+  const candidatos = frases.map((f) => f.trim()).filter((f) => f.length > 12);
+  if (candidatos.length === 0) return trechos[0]?.split('\n').slice(1).join(' ').trim() ?? '';
+
+  // Em quantas frases cada termo aparece — a base da raridade.
+  const ocorrencias = new Map<string, number>();
+  for (const termo of termos) {
+    ocorrencias.set(termo, candidatos.filter((f) => normalizar(f).includes(termo)).length);
+  }
 
   const pontuar = (frase: string) => {
-    const normalizada = frase
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[̀-ͯ]/g, '');
+    const texto = normalizar(frase);
     let pontos = 0;
-    for (const p of palavras) if (normalizada.includes(p)) pontos++;
+    for (const termo of termos) {
+      if (!texto.includes(termo)) continue;
+      const em = ocorrencias.get(termo) ?? candidatos.length;
+      // Termo presente em todas as frases não distingue nada; peso ~1.
+      // Termo presente em uma só é o que a pergunta realmente busca.
+      pontos += candidatos.length / em;
+    }
     return pontos;
   };
 
-  const melhor = [...frases].sort((a, b) => pontuar(b) - pontuar(a))[0]!;
-  return melhor;
+  return [...candidatos].sort((a, b) => pontuar(b) - pontuar(a))[0]!;
 }

@@ -3,6 +3,7 @@ import { childLogger, inicioDoDiaLocal, partesLocais, uuidv7 } from '@otto/share
 
 import { recuperar, temFundamento, type TrechoRecuperado } from '../knowledge/recuperacao.ts';
 import { blocoDeConhecimento, contextoDaEmpresa, historicoDaConversa } from './contexto.ts';
+import { avaliarFundamento, type OrigemFundamento } from './fundamento.ts';
 import {
   compilarInstrucao,
   esquemaPersonalidade,
@@ -77,7 +78,18 @@ export async function responder(pedido: PedidoAgente): Promise<ResultadoAgente> 
   }
 
   const trechos = await recuperar(tenantId, textoDoCliente, { embedding, limite: 5 });
-  const fundamentado = temFundamento(trechos);
+
+  // O contexto da empresa é buscado antes de decidir, e não depois: horário,
+  // endereço e telefone são fundamento tão legítimo quanto a base de
+  // conhecimento — e são as perguntas mais comuns de um comércio.
+  const empresa = await contextoDaEmpresa(tenantId);
+  const origem = avaliarFundamento(
+    textoDoCliente,
+    trechos,
+    empresa,
+    temFundamento(trechos),
+  );
+  const fundamentado = origem !== 'nenhum';
 
   // ── Sem fundamento: não chama o modelo ──────────────────────────────────────
   if (!fundamentado) {
@@ -117,12 +129,23 @@ export async function responder(pedido: PedidoAgente): Promise<ResultadoAgente> 
   }
 
   // ── Geração ─────────────────────────────────────────────────────────────────
-  const empresa = await contextoDaEmpresa(tenantId);
   const { mensagens: historico } = await historicoDaConversa(tenantId, conversationId);
 
   const mensagens: MensagemChat[] = [
-    { papel: 'sistema', conteudo: compilarInstrucao(personalidade, empresa) },
-    { papel: 'sistema', conteudo: blocoDeConhecimento(trechos) },
+    {
+      papel: 'sistema',
+      marcador: 'instrucao',
+      conteudo: compilarInstrucao(personalidade, empresa),
+    },
+    {
+      papel: 'sistema',
+      marcador: 'conhecimento',
+      conteudo: blocoDeConhecimento(
+        trechos,
+        empresa,
+        origem === 'unidades' || origem === 'ambos',
+      ),
+    },
     ...historico,
   ];
 
@@ -151,7 +174,7 @@ export async function responder(pedido: PedidoAgente): Promise<ResultadoAgente> 
       cacheados: resultado.uso.tokensCacheados,
     });
 
-    const confianca = calcularConfianca(trechos, resultado.texto);
+    const confianca = calcularConfianca(trechos, resultado.texto, origem);
     const abaixoDoLimiar = confianca < personalidade.limiarConfianca;
     const desfecho: DesfechoAgente = !resultado.texto?.trim()
       ? 'erro'
@@ -243,15 +266,24 @@ export async function responder(pedido: PedidoAgente): Promise<ResultadoAgente> 
  * O que medimos: força do que foi recuperado, se veio pelos dois caminhos de
  * busca, e se a resposta não é uma recusa disfarçada.
  */
-function calcularConfianca(trechos: TrechoRecuperado[], texto: string | null): number {
+function calcularConfianca(
+  trechos: TrechoRecuperado[],
+  texto: string | null,
+  origem: OrigemFundamento,
+): number {
   if (!texto?.trim()) return 0;
 
   const melhor = trechos[0];
-  if (!melhor) return 0;
+
+  // Fundamento vindo só das unidades não passa pela recuperação, e é dado
+  // cadastrado e exato — endereço e horário são mais confiáveis que qualquer
+  // trecho de texto recuperado por similaridade.
+  if (!melhor) return origem === 'unidades' ? 0.8 : 0;
 
   // O escore do RRF vive numa faixa estreita; normaliza para algo interpretável.
   let confianca = Math.min(1, melhor.escore / (1 / 61) / 2);
   if (melhor.origem === 'ambos') confianca = Math.min(1, confianca + 0.2);
+  if (origem === 'ambos') confianca = Math.min(1, confianca + 0.15);
   if (trechos.length >= 2) confianca = Math.min(1, confianca + 0.1);
 
   // Resposta que admite desconhecimento não deve passar como confiante — é

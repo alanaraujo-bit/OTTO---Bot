@@ -12,6 +12,16 @@
 export interface MensagemChat {
   papel: 'sistema' | 'usuario' | 'assistente' | 'ferramenta';
   conteudo: string;
+  /**
+   * O que esta mensagem é dentro do pedido.
+   *
+   * Existe para que nada precise reconhecer o bloco de conhecimento procurando
+   * uma palavra no texto. A instrução do agente **menciona** a palavra
+   * "CONHECIMENTO" ao proibir o modelo de sair dela, e um filtro por string
+   * confundia as duas — chegou a fazer uma frase da instrução ser enviada ao
+   * cliente como se fosse resposta.
+   */
+  marcador?: 'instrucao' | 'conhecimento';
   /** Preenchido quando `papel` é `ferramenta`. */
   nomeFerramenta?: string;
   chamadaId?: string;
