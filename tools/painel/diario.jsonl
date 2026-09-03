@@ -19,3 +19,5 @@
 {"quando":"2026-09-03T02:50:00.000Z","texto":"Falha grave na regra anti-alucinação corrigida","detalhe":"'vendem pneu de caminhão?' recebia resposta sobre açougue. Agora mede cobertura de termos, não só posição"}
 {"quando":"2026-09-03T02:55:00.000Z","texto":"Instrução do sistema vazava como resposta ao cliente","detalhe":"O marcador por string colidia com a própria instrução; agora é estrutural"}
 {"quando":"2026-09-03T03:00:00.000Z","texto":"Horário e endereço passaram a ser fundamento válido","detalhe":"As perguntas mais comuns de um comércio iam todas para humano mesmo com o dado cadastrado"}
+{"quando":"2026-09-03T03:20:00.000Z","texto":"Centro de Conhecimento com versionamento","detalhe":"Rascunho → publicado → arquivado, versão imutável a cada publicação, uso real por item"}
+{"quando":"2026-09-03T03:25:00.000Z","texto":"Ciclo de aprendizado fechado sem autocontaminação","detalhe":"4 clientes perguntaram sobre gás; virou sugestão. Aceitar exige que a pessoa escreva a resposta"}

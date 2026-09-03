@@ -1,3 +1,22 @@
+## Verificação visual pelo navegador — parcialmente bloqueada
+
+**Situação:** a extensão do Claude para Chrome esteve conectada e validou as
+primeiras telas (acesso, console, dois temas, contraste medido). Depois de uma
+troca de conta durante a sessão, ela desconectou e não voltou.
+
+**O que isso custa:** telas construídas depois disso — Inbox, Conhecimento,
+Melhorias — foram validadas por HTML renderizado com sessão real (conteúdo,
+dados, permissões, estados), mas **não** por inspeção visual de pixel. Isso
+significa que alinhamento, truncamento e comportamento em largura de celular
+seguem por conferir nessas telas.
+
+**Para religar, quando puder:** confirme que a extensão está ativa em
+`chrome://extensions`, e que o Chrome está logado no claude.ai com a **mesma
+conta** do Claude Code. Reiniciar o Chrome costuma resolver. Feito isso, peço a
+inspeção visual completa das telas pendentes e corrijo o que aparecer.
+
+---
+
 # Bloqueios
 
 O que depende de ação sua e **não pode** ser resolvido daqui. Nada nesta lista

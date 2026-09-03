@@ -14,7 +14,8 @@
     "./events": "./src/events/index.ts",
     "./audit": "./src/audit/index.ts",
     "./usage": "./src/usage/index.ts",
-    "./metricas": "./src/metricas/index.ts"
+    "./metricas": "./src/metricas/index.ts",
+    "./aprendizado": "./src/aprendizado/index.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

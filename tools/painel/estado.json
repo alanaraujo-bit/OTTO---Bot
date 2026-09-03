@@ -33,35 +33,35 @@
       "id": "console",
       "nome": "Console",
       "resumo": "Shell, navegação, Home operacional, usuários e permissões",
-      "estado": "pendente",
+      "estado": "concluida",
       "criterio": "O proprietário convida alguém e o papel efetivamente restringe"
     },
     {
       "id": "inbox",
       "nome": "Inbox",
       "resumo": "Caixa unificada, modos automático/copilot/humano, handoff",
-      "estado": "em_andamento",
+      "estado": "concluida",
       "criterio": "Operador assume pelo celular e o cliente não repete nada"
     },
     {
       "id": "conhecimento",
       "nome": "Centro de Conhecimento",
       "resumo": "Categorias, versionamento, aprovação, conflitos, procedência",
-      "estado": "pendente",
+      "estado": "concluida",
       "criterio": "Publicar um item muda a resposta do agente na conversa seguinte"
     },
     {
       "id": "agente",
       "nome": "Agente",
       "resumo": "Comportamento em controles compreensíveis, versionado",
-      "estado": "pendente",
+      "estado": "em_andamento",
       "criterio": "Mudar personalidade altera o estilo sem alterar os fatos"
     },
     {
       "id": "aprendizado",
       "nome": "Aprendizado",
       "resumo": "Sinais, sugestões, revisão humana, publicação versionada",
-      "estado": "pendente",
+      "estado": "concluida",
       "criterio": "Pergunta repetida sem resposta gera sugestão concreta"
     },
     {

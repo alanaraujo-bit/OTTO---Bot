@@ -2,6 +2,7 @@ import { agents, agentVersions, aiRuns, and, eq, usageEvents, withTenant } from 
 import { childLogger, inicioDoDiaLocal, partesLocais, uuidv7 } from '@otto/shared';
 
 import { recuperar, temFundamento, type TrechoRecuperado } from '../knowledge/recuperacao.ts';
+import { registrarUso } from '../knowledge/gestao.ts';
 import { blocoDeConhecimento, contextoDaEmpresa, historicoDaConversa } from './contexto.ts';
 import { avaliarFundamento, type OrigemFundamento } from './fundamento.ts';
 import {
@@ -202,6 +203,12 @@ export async function responder(pedido: PedidoAgente): Promise<ResultadoAgente> 
       tentativas,
       fuso,
     });
+
+    // Marca o conhecimento que sustentou a resposta: alimenta "o que a minha IA
+    // realmente usa?" e revela item publicado que nunca é recuperado.
+    if (desfecho === 'ok') {
+      await registrarUso(tenantId, [...new Set(trechos.map((t) => t.itemId))]);
+    }
 
     log.info({ runId, desfecho, confianca, custo, latenciaMs }, 'agente respondeu');
 

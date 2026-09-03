@@ -12,6 +12,7 @@ import { childLogger, minutos, uuidv7 } from '@otto/shared';
 
 import { responder } from '../ai/agente.ts';
 import { ehViolacaoDeUnicidade } from './conflito.ts';
+import { registrarSinal } from '../aprendizado/sinais.ts';
 
 /**
  * Atendimento automático.
@@ -125,6 +126,19 @@ export async function atenderAutomaticamente(
           : 'erro_no_agente';
 
     await encaminharParaHumano(tenantId, conversationId, motivo, resultado.runId);
+
+    // O sinal é o insumo do aprendizado. Só um fato observado — não muda nada
+    // sozinho, e precisa se repetir para virar sugestão a um humano.
+    await registrarSinal({
+      tenantId,
+      tipo: motivo === 'sem_conhecimento' ? 'sem_resultado' : 'confianca_baixa',
+      conversationId,
+      messageId: mensagemId,
+      pergunta: textoDoCliente,
+      confianca: resultado.confianca,
+      dados: { textoOriginal: textoDoCliente, runId: resultado.runId },
+    });
+
     return { respondeu: false, runId: resultado.runId, handoff: motivo };
   }
 
