@@ -75,14 +75,14 @@
       "id": "inteligencia",
       "nome": "Analytics e custos",
       "resumo": "Períodos, comparação, custo por conversa, drill-down",
-      "estado": "em_andamento",
+      "estado": "concluida",
       "criterio": "Clicar em uma métrica abre exatamente as conversas que a originaram"
     },
     {
       "id": "backoffice",
       "nome": "Backoffice do SaaS",
       "resumo": "Empresas, planos, limites, consumo, saúde, ações administrativas",
-      "estado": "pendente",
+      "estado": "em_andamento",
       "criterio": "Operar o SaaS não exige mais editar o banco à mão"
     },
     {

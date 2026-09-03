@@ -23,3 +23,5 @@
 {"quando":"2026-09-03T03:25:00.000Z","texto":"Ciclo de aprendizado fechado sem autocontaminação","detalhe":"4 clientes perguntaram sobre gás; virou sugestão. Aceitar exige que a pessoa escreva a resposta"}
 {"quando":"2026-09-03T03:30:00.000Z","texto":"Worker no ar: envio, embeddings e aprendizado","detalhe":"Cadeia completa até a entrega — mensagem sai como 'enviada', não fica pendente"}
 {"quando":"2026-09-03T03:32:00.000Z","texto":"Log de erro passou a dizer o que aconteceu","detalhe":"Registrava {code:interno,status:500} e nada mais; a causa raiz ficava invisível"}
+{"quando":"2026-09-03T03:40:00.000Z","texto":"Analytics com comparação e drill-down","detalhe":"Toda métrica leva às conversas que a originaram; gráfico em SVG sem biblioteca"}
+{"quando":"2026-09-03T03:45:00.000Z","texto":"Bug grave de fuso horário corrigido","detalhe":"O dia local retornava meia-noite UTC: toda métrica diária contava o dia errado. new Date(string) usa o fuso do processo"}

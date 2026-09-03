@@ -70,21 +70,56 @@ export function partesLocais(instante: Date, fuso: string = FUSO_PADRAO): Partes
 }
 
 /**
+ * Deslocamento do fuso em relação ao UTC, em milissegundos, naquele instante.
+ *
+ * Medido a partir do próprio instante, e não de uma tabela: assim funciona onde
+ * há horário de verão, e continua correto se as regras do fuso mudarem.
+ */
+function deslocamentoMs(instante: Date, fuso: string): number {
+  const partes = Object.fromEntries(
+    new Intl.DateTimeFormat('en-US', {
+      timeZone: fuso,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    })
+      .formatToParts(instante)
+      .map((p) => [p.type, p.value]),
+  ) as Record<string, string>;
+
+  // Reinterpreta a hora local como se fosse UTC; a diferença é o deslocamento.
+  const comoSeFosseUtc = Date.UTC(
+    Number(partes.year),
+    Number(partes.month) - 1,
+    Number(partes.day),
+    Number(partes.hour) % 24,
+    Number(partes.minute),
+    Number(partes.second),
+  );
+
+  return comoSeFosseUtc - instante.getTime();
+}
+
+/**
  * Instante em que começou o dia local da empresa.
  *
  * Existe porque "conversas hoje" precisa bater com o que o dono viu na loja: às
  * 21h em Canaã dos Carajás já é o dia seguinte em UTC, e agregar por data UTC
  * jogaria as três últimas horas de movimento no dia errado.
  *
- * O truque: interpreta a meia-noite local como se fosse UTC, mede o quanto esse
- * instante se desloca ao ser lido no fuso alvo, e corrige. Funciona também onde
- * o deslocamento muda, porque a medição usa a própria data em questão.
+ * Cuidado com a armadilha aqui: `new Date('...').toLocaleString()` e a volta
+ * parecem resolver isto, mas `new Date(string)` reinterpreta a string no fuso do
+ * **processo** — então o resultado fica certo na máquina de quem escreveu e
+ * errado no servidor. Por isso o deslocamento é medido explicitamente.
  */
 export function inicioDoDiaLocal(instante: Date, fuso: string = FUSO_PADRAO): Date {
   const { dataISO } = partesLocais(instante, fuso);
-  const comoUtc = new Date(`${dataISO}T00:00:00Z`);
-  const lidoNoFuso = new Date(comoUtc.toLocaleString('en-US', { timeZone: fuso }));
-  return new Date(comoUtc.getTime() + (comoUtc.getTime() - lidoNoFuso.getTime()));
+  const meiaNoiteComoUtc = new Date(`${dataISO}T00:00:00Z`);
+  return new Date(meiaNoiteComoUtc.getTime() - deslocamentoMs(meiaNoiteComoUtc, fuso));
 }
 
 /** `"7:30"` ou `"21:00"` → minutos desde a meia-noite. Retorna null se malformado. */

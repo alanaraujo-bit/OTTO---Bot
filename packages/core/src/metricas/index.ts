@@ -4,3 +4,15 @@ export {
   formatarDuracao,
   type IndicadoresHome,
 } from './home.ts';
+
+export {
+  assuntosFrequentes,
+  janela,
+  resumo,
+  serieDiaria,
+  type AssuntoFrequente,
+  type JanelaTempo,
+  type Periodo,
+  type PontoDoDia,
+  type ResumoAnalytics,
+} from './analytics.ts';
