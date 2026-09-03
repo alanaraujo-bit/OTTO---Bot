@@ -3,6 +3,7 @@ import {
   asc,
   desc,
   eq,
+  inArray,
   knowledgeCategories,
   knowledgeItems,
   knowledgeVersions,
@@ -365,6 +366,8 @@ export async function registrarUso(tenantId: string, itemIds: string[]): Promise
         usageCount: sql`${knowledgeItems.usageCount} + 1`,
         lastUsedAt: new Date(),
       })
-      .where(sql`${knowledgeItems.id} = any(${itemIds})`),
+      // `inArray` e não `any(...)`: o driver serializa o array de parâmetros
+      // como texto, e o Postgres recusa por não parecer um literal de array.
+      .where(inArray(knowledgeItems.id, itemIds)),
   );
 }

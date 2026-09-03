@@ -79,6 +79,49 @@ export function isAppError(error: unknown): error is AppError {
 }
 
 /**
+ * Descreve um erro para o log, com a cadeia de causas.
+ *
+ * Existe porque o serializador padrão do logger só enxerga as propriedades
+ * enumeráveis de `AppError` — e `message` e `cause` não são. O resultado era um
+ * log que dizia `{"code":"interno","status":500}` e nada mais: tecnicamente um
+ * registro de erro, praticamente inútil.
+ *
+ * A pergunta que o §33 da missão exige responder — "por que essa mensagem não
+ * foi enviada?" — depende disto.
+ */
+export function descreverErro(error: unknown): Record<string, unknown> {
+  const cadeia: string[] = [];
+  let atual: unknown = error;
+  let profundidade = 0;
+
+  while (atual && profundidade < 5) {
+    if (atual instanceof Error) {
+      cadeia.push(`${atual.name}: ${atual.message}`);
+      atual = atual.cause;
+    } else if (typeof atual === 'object' && atual !== null && 'message' in atual) {
+      cadeia.push(String((atual as { message: unknown }).message));
+      atual = undefined;
+    } else {
+      if (atual !== undefined) cadeia.push(String(atual));
+      atual = undefined;
+    }
+    profundidade++;
+  }
+
+  const app = isAppError(error) ? error : null;
+
+  return {
+    mensagem: cadeia[0] ?? 'erro desconhecido',
+    ...(cadeia.length > 1 ? { causa: cadeia.slice(1) } : {}),
+    ...(app ? { codigo: app.code, status: app.status, recuperavel: app.retryable } : {}),
+    ...(app && Object.keys(app.context).length ? { contexto: app.context } : {}),
+    ...(error instanceof Error && error.stack
+      ? { pilha: error.stack.split('\n').slice(1, 4).map((l) => l.trim()) }
+      : {}),
+  };
+}
+
+/**
  * Converte qualquer coisa lançada em algo com forma previsível.
  * Um `throw 'string'` em uma dependência não pode derrubar o tratamento de erro.
  */

@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 import { atenderAutomaticamente, receberMensagem } from '@otto/core/conversations';
 import { and, channels, eq, withTenant } from '@otto/db';
-import { logger, toAppError, uuidv7 } from '@otto/shared';
+import { descreverErro, logger, toAppError, uuidv7 } from '@otto/shared';
 
 /**
  * Webhook do canal de teste.
@@ -93,7 +93,7 @@ export async function POST(requisicao: Request) {
     });
   } catch (erro) {
     const app = toAppError(erro);
-    logger.error({ erro: app, contexto: app.context }, 'webhook do simulador falhou');
+    logger.error({ erro: descreverErro(erro) }, 'webhook do simulador falhou');
     return NextResponse.json({ erro: app.message }, { status: app.status });
   }
 }

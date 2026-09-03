@@ -13,6 +13,7 @@ import { childLogger, minutos, uuidv7 } from '@otto/shared';
 import { responder } from '../ai/agente.ts';
 import { ehViolacaoDeUnicidade } from './conflito.ts';
 import { registrarSinal } from '../aprendizado/sinais.ts';
+import { enfileirarEnvio } from '../queue/filas.ts';
 
 /**
  * Atendimento automático.
@@ -185,6 +186,10 @@ export async function atenderAutomaticamente(
     log.info('resposta já havia sido gerada para esta mensagem');
     return { respondeu: false, runId: resultado.runId };
   }
+
+  // O envio sai do caminho síncrono: a resposta já está gravada e visível na
+  // Inbox, e a entrega ao provedor pode tentar de novo sem segurar ninguém.
+  await enfileirarEnvio({ tenantId, messageId: mensagemDeSaida });
 
   log.info({ mensagemId: mensagemDeSaida, runId: resultado.runId }, 'resposta gerada');
   return { respondeu: true, mensagemId: mensagemDeSaida, runId: resultado.runId };

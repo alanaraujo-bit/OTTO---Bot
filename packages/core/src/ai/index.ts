@@ -42,3 +42,19 @@ export {
   type PedidoAgente,
   type ResultadoAgente,
 } from './agente.ts';
+
+export {
+  lerConfiguracao,
+  previaDaInstrucao,
+  publicarConfiguracao,
+  reverterPara,
+  salvarRascunho,
+  type ConfiguracaoAgente,
+} from './configuracao.ts';
+
+export {
+  avaliarFundamento,
+  perguntaSobreUnidade,
+  unidadesRespondem,
+  type OrigemFundamento,
+} from './fundamento.ts';

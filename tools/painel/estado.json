@@ -54,7 +54,7 @@
       "id": "agente",
       "nome": "Agente",
       "resumo": "Comportamento em controles compreensíveis, versionado",
-      "estado": "em_andamento",
+      "estado": "concluida",
       "criterio": "Mudar personalidade altera o estilo sem alterar os fatos"
     },
     {
@@ -75,7 +75,7 @@
       "id": "inteligencia",
       "nome": "Analytics e custos",
       "resumo": "Períodos, comparação, custo por conversa, drill-down",
-      "estado": "pendente",
+      "estado": "em_andamento",
       "criterio": "Clicar em uma métrica abre exatamente as conversas que a originaram"
     },
     {

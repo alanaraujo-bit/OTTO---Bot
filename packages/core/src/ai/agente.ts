@@ -1,5 +1,5 @@
 import { agents, agentVersions, aiRuns, and, eq, usageEvents, withTenant } from '@otto/db';
-import { childLogger, inicioDoDiaLocal, partesLocais, uuidv7 } from '@otto/shared';
+import { childLogger, descreverErro, inicioDoDiaLocal, partesLocais, uuidv7 } from '@otto/shared';
 
 import { recuperar, temFundamento, type TrechoRecuperado } from '../knowledge/recuperacao.ts';
 import { registrarUso } from '../knowledge/gestao.ts';
@@ -226,7 +226,7 @@ export async function responder(pedido: PedidoAgente): Promise<ResultadoAgente> 
     };
   } catch (erro) {
     const latenciaMs = Date.now() - inicio;
-    log.error({ runId, erro }, 'agente falhou');
+    log.error({ runId, erro: descreverErro(erro) }, 'agente falhou');
 
     await registrarExecucao({
       runId,

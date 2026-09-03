@@ -21,3 +21,5 @@
 {"quando":"2026-09-03T03:00:00.000Z","texto":"Horário e endereço passaram a ser fundamento válido","detalhe":"As perguntas mais comuns de um comércio iam todas para humano mesmo com o dado cadastrado"}
 {"quando":"2026-09-03T03:20:00.000Z","texto":"Centro de Conhecimento com versionamento","detalhe":"Rascunho → publicado → arquivado, versão imutável a cada publicação, uso real por item"}
 {"quando":"2026-09-03T03:25:00.000Z","texto":"Ciclo de aprendizado fechado sem autocontaminação","detalhe":"4 clientes perguntaram sobre gás; virou sugestão. Aceitar exige que a pessoa escreva a resposta"}
+{"quando":"2026-09-03T03:30:00.000Z","texto":"Worker no ar: envio, embeddings e aprendizado","detalhe":"Cadeia completa até a entrega — mensagem sai como 'enviada', não fica pendente"}
+{"quando":"2026-09-03T03:32:00.000Z","texto":"Log de erro passou a dizer o que aconteceu","detalhe":"Registrava {code:interno,status:500} e nada mais; a causa raiz ficava invisível"}
