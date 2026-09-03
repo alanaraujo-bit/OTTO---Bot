@@ -14,18 +14,13 @@ import { acaoEntrar, type EstadoEntrada } from './acoes.ts';
  * envio real da server action em vez de um cronômetro que pode dessincronizar.
  */
 
-function BotaoEntrar({ habilitado }: { habilitado: boolean }) {
+function BotaoEntrar() {
   const { pending } = useFormStatus();
 
+  // Sem `disabled`: um botão apagado na tela de entrada parece quebrado. A
+  // validação acontece na server action e volta como mensagem amigável.
   return (
-    <Botao
-      type="submit"
-      variante="primaria"
-      larguraTotal
-      carregando={pending}
-      disabled={!habilitado}
-      className="mt-1"
-    >
+    <Botao type="submit" variante="primaria" larguraTotal carregando={pending} className="mt-1">
       {pending ? 'Entrando…' : 'Entrar'}
     </Botao>
   );
@@ -86,7 +81,7 @@ export function FormularioEntrada({ proximo }: { proximo?: string }) {
         </p>
       )}
 
-      <BotaoEntrar habilitado={Boolean(email && senha)} />
+      <BotaoEntrar />
     </form>
   );
 }

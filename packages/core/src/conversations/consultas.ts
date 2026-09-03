@@ -222,3 +222,41 @@ export async function marcarComoLida(tenantId: string, conversationId: string): 
     tx.update(conversations).set({ unreadCount: 0 }).where(eq(conversations.id, conversationId)),
   );
 }
+
+export interface ContagemInbox {
+  abertas: number;
+  aguardando_humano: number;
+  resolvidas: number;
+  todas: number;
+  /** Mensagens ainda não lidas pela equipe, somadas. */
+  naoLidas: number;
+}
+
+/**
+ * Quantas conversas há em cada filtro.
+ *
+ * Uma consulta só, para a lista poder mostrar o tamanho da fila em cada aba sem
+ * quatro viagens ao banco. "Esperando 11" é a informação que faz o dono abrir a
+ * Inbox — o número precisa estar na aba, não escondido lá dentro.
+ */
+export async function contarConversas(tenantId: string): Promise<ContagemInbox> {
+  return withTenant(tenantId, async (tx) => {
+    const [c] = await tx
+      .select({
+        abertas: sql<number>`count(*) filter (where ${conversations.status} in ('aberta','aguardando_cliente','aguardando_humano'))::int`,
+        aguardando_humano: sql<number>`count(*) filter (where ${conversations.status} = 'aguardando_humano')::int`,
+        resolvidas: sql<number>`count(*) filter (where ${conversations.status} in ('resolvida','encerrada'))::int`,
+        todas: sql<number>`count(*)::int`,
+        naoLidas: sql<number>`coalesce(sum(${conversations.unreadCount}), 0)::int`,
+      })
+      .from(conversations);
+
+    return {
+      abertas: c?.abertas ?? 0,
+      aguardando_humano: c?.aguardando_humano ?? 0,
+      resolvidas: c?.resolvidas ?? 0,
+      todas: c?.todas ?? 0,
+      naoLidas: c?.naoLidas ?? 0,
+    };
+  });
+}

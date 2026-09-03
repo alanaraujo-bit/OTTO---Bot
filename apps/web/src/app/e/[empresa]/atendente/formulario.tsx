@@ -3,9 +3,10 @@
 import { useEffect, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Check, RotateCcw } from 'lucide-react';
-import { Botao, Campo, cn, Etiqueta, tempoRelativo } from '@otto/ui';
+import { Botao, Campo, Cartao, cn, Etiqueta, tempoRelativo } from '@otto/ui';
 
 import type { ConfiguracaoAgente, Personalidade } from '@otto/core/ai';
+import { Previa } from '@/componentes/atendente/previa.tsx';
 import { acaoPublicar, acaoReverter, acaoSalvar } from './acoes.ts';
 
 /**
@@ -82,140 +83,151 @@ export function FormularioAgente({
     JSON.stringify(valores) !== JSON.stringify(configuracao.publicada);
 
   return (
-    <div className="grid gap-7">
-      <section className="grid gap-4">
-        <Campo
-          rotulo="Nome do atendente"
-          value={valores.nome}
-          required
-          disabled={!podeEditar}
-          ajuda="É como ele se apresenta ao cliente. Um nome de pessoa funciona melhor que “Atendimento”."
-          onChange={(e) => alterar('nome', e.target.value)}
-        />
-      </section>
+    <div>
+      <div className="lg:grid lg:grid-cols-[1fr_21rem] lg:items-start lg:gap-5">
+        {/* ── Controles ──────────────────────────────────────────────────── */}
+        <div className="grid gap-4">
+          <Cartao titulo="Identidade">
+            <Campo
+              rotulo="Nome do atendente"
+              value={valores.nome}
+              required
+              disabled={!podeEditar}
+              ajuda="É como ele se apresenta ao cliente. Um nome de pessoa funciona melhor que “Atendimento”."
+              onChange={(e) => alterar('nome', e.target.value)}
+            />
+          </Cartao>
 
-      <section className="grid gap-5">
-        <h2 className="text-xs font-medium tracking-[0.04em] text-texto-3 uppercase">
-          Jeito de conversar
-        </h2>
+          <Cartao
+            titulo="Jeito de conversar"
+            descricao="Cada ajuste muda o tom da conversa, não um número. Veja o efeito na prévia."
+          >
+            <div className="grid gap-4">
+              <Escala
+                rotulo="Formalidade"
+                valor={valores.formalidade}
+                descricoes={DESCRICAO_FORMALIDADE}
+                desabilitado={!podeEditar}
+                onChange={(v) => alterar('formalidade', v)}
+              />
+              <Escala
+                rotulo="Acolhimento"
+                valor={valores.calor}
+                descricoes={DESCRICAO_CALOR}
+                desabilitado={!podeEditar}
+                onChange={(v) => alterar('calor', v)}
+              />
+              <Escala
+                rotulo="Tamanho das respostas"
+                valor={valores.detalhamento}
+                descricoes={DESCRICAO_DETALHE}
+                desabilitado={!podeEditar}
+                onChange={(v) => alterar('detalhamento', v)}
+              />
 
-        <Escala
-          rotulo="Formalidade"
-          valor={valores.formalidade}
-          descricoes={DESCRICAO_FORMALIDADE}
-          desabilitado={!podeEditar}
-          onChange={(v) => alterar('formalidade', v)}
-        />
-        <Escala
-          rotulo="Acolhimento"
-          valor={valores.calor}
-          descricoes={DESCRICAO_CALOR}
-          desabilitado={!podeEditar}
-          onChange={(v) => alterar('calor', v)}
-        />
-        <Escala
-          rotulo="Tamanho das respostas"
-          valor={valores.detalhamento}
-          descricoes={DESCRICAO_DETALHE}
-          desabilitado={!podeEditar}
-          onChange={(v) => alterar('detalhamento', v)}
-        />
+              <div className="grid gap-1.5">
+                <span className="text-xs font-medium text-texto-2">Emojis</span>
+                <div className="flex gap-1.5">
+                  {(
+                    [
+                      ['nunca', 'Nunca'],
+                      ['raramente', 'Com moderação'],
+                      ['a_vontade', 'À vontade'],
+                    ] as const
+                  ).map(([valor, rotulo]) => (
+                    <button
+                      key={valor}
+                      type="button"
+                      disabled={!podeEditar}
+                      aria-pressed={valores.emojis === valor}
+                      onClick={() => alterar('emojis', valor)}
+                      className={cn(
+                        'flex-1 rounded-sm border px-2.5 py-1.5 text-xs font-medium transition-colors duration-[var(--dur-controle)]',
+                        'max-md:min-h-11 max-md:px-3 disabled:opacity-50',
+                        valores.emojis === valor
+                          ? 'border-marca bg-marca-suave text-marca'
+                          : 'border-linha-firme bg-superficie text-texto-2 hover:bg-superficie-2',
+                      )}
+                    >
+                      {rotulo}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </Cartao>
 
-        <div className="grid gap-1.5">
-          <span className="text-xs font-medium text-texto-2">Emojis</span>
-          <div className="flex gap-1.5">
-            {(
-              [
-                ['nunca', 'Nunca'],
-                ['raramente', 'Com moderação'],
-                ['a_vontade', 'À vontade'],
-              ] as const
-            ).map(([valor, rotulo]) => (
-              <button
-                key={valor}
-                type="button"
-                disabled={!podeEditar}
-                aria-pressed={valores.emojis === valor}
-                onClick={() => alterar('emojis', valor)}
-                className={cn(
-                  'rounded-sm border px-2.5 py-1.5 text-xs font-medium transition-colors duration-[120ms]',
-                  'max-md:min-h-11 max-md:px-3 disabled:opacity-50',
-                  valores.emojis === valor
-                    ? 'border-marca bg-marca-suave text-marca'
-                    : 'border-linha-firme bg-superficie text-texto-2 hover:bg-superficie-2',
-                )}
-              >
-                {rotulo}
-              </button>
-            ))}
-          </div>
+          <Cartao
+            titulo="Quando chamar uma pessoa"
+            descricao="Nesses casos a Bia não tenta resolver — avisa que vai chamar a equipe."
+          >
+            <div className="grid gap-4">
+              <div className="grid gap-1.5">
+                <label htmlFor="assuntos-humanos" className="text-xs font-medium text-texto-2">
+                  Assuntos que sempre vão para a equipe
+                </label>
+                <textarea
+                  id="assuntos-humanos"
+                  rows={3}
+                  disabled={!podeEditar}
+                  value={valores.assuntosHumanos.join('\n')}
+                  onChange={(e) =>
+                    alterar(
+                      'assuntosHumanos',
+                      e.target.value.split('\n').map((l) => l.trim()).filter(Boolean).slice(0, 20),
+                    )
+                  }
+                  placeholder={'reclamação grave\nproblema com pagamento já feito'}
+                  className="resize-y rounded-sm border border-linha-firme bg-superficie px-2.5 py-2 text-sm text-texto placeholder:text-texto-3 focus:border-marca focus:outline-none focus-visible:ring-2 focus-visible:ring-marca/25 disabled:opacity-60"
+                />
+                <p className="text-2xs text-texto-3">Um assunto por linha.</p>
+              </div>
+
+              <div className="grid gap-1.5">
+                <label htmlFor="observacoes" className="text-xs font-medium text-texto-2">
+                  Orientações da empresa
+                  <span className="ml-1.5 font-normal text-texto-3">opcional</span>
+                </label>
+                <textarea
+                  id="observacoes"
+                  rows={3}
+                  disabled={!podeEditar}
+                  value={valores.observacoes}
+                  onChange={(e) => alterar('observacoes', e.target.value.slice(0, 1000))}
+                  placeholder="Ex.: quando perguntarem de encomenda de bolo, peça o telefone e diga que a padaria retorna."
+                  className="resize-y rounded-sm border border-linha-firme bg-superficie px-2.5 py-2 text-sm text-texto placeholder:text-texto-3 focus:border-marca focus:outline-none focus-visible:ring-2 focus-visible:ring-marca/25 disabled:opacity-60"
+                />
+                <p className="text-2xs text-texto-3">
+                  Orientações de comportamento. Não substituem o Conhecimento: a Bia continua sem
+                  inventar informação que não está cadastrada.
+                </p>
+              </div>
+            </div>
+          </Cartao>
+
+          {erro && (
+            <p
+              role="alert"
+              className="rounded-sm border border-falha/25 bg-falha-suave px-3 py-2 text-xs text-falha"
+            >
+              {erro}
+            </p>
+          )}
         </div>
-      </section>
 
-      <section className="grid gap-4">
-        <h2 className="text-xs font-medium tracking-[0.04em] text-texto-3 uppercase">
-          Quando chamar uma pessoa
-        </h2>
+        {/* ── Prévia (rail no desktop, bloco no celular) ─────────────────── */}
+        <aside className="mt-4 lg:sticky lg:top-6 lg:mt-0">
+          <Cartao titulo="Prévia" descricao="Como a Bia responderia com os ajustes atuais">
+            <Previa valores={valores} />
+          </Cartao>
+        </aside>
+      </div>
 
-        <div className="grid gap-1.5">
-          <label htmlFor="assuntos-humanos" className="text-xs font-medium text-texto-2">
-            Assuntos que sempre vão para a equipe
-          </label>
-          <textarea
-            id="assuntos-humanos"
-            rows={3}
-            disabled={!podeEditar}
-            value={valores.assuntosHumanos.join('\n')}
-            onChange={(e) =>
-              alterar(
-                'assuntosHumanos',
-                e.target.value.split('\n').map((l) => l.trim()).filter(Boolean).slice(0, 20),
-              )
-            }
-            placeholder={'reclamação grave\nproblema com pagamento já feito'}
-            className="resize-y rounded-sm border border-linha-firme bg-superficie px-2.5 py-2 text-sm text-texto placeholder:text-texto-3 focus:border-marca focus:outline-none focus-visible:ring-2 focus-visible:ring-marca/25 disabled:opacity-60"
-          />
-          <p className="text-2xs text-texto-3">
-            Um assunto por linha. Nesses casos o atendente não tenta resolver: avisa que vai chamar
-            alguém da equipe.
-          </p>
-        </div>
-
-        <div className="grid gap-1.5">
-          <label htmlFor="observacoes" className="text-xs font-medium text-texto-2">
-            Orientações da empresa
-            <span className="ml-1.5 font-normal text-texto-3">opcional</span>
-          </label>
-          <textarea
-            id="observacoes"
-            rows={3}
-            disabled={!podeEditar}
-            value={valores.observacoes}
-            onChange={(e) => alterar('observacoes', e.target.value.slice(0, 1000))}
-            placeholder="Ex.: quando perguntarem de encomenda de bolo, peça o telefone e diga que a padaria retorna."
-            className="resize-y rounded-sm border border-linha-firme bg-superficie px-2.5 py-2 text-sm text-texto placeholder:text-texto-3 focus:border-marca focus:outline-none focus-visible:ring-2 focus-visible:ring-marca/25 disabled:opacity-60"
-          />
-          <p className="text-2xs text-texto-3">
-            Orientações de comportamento. Não substituem o Conhecimento: o atendente continua sem
-            inventar informação que não está cadastrada.
-          </p>
-        </div>
-      </section>
-
-      {erro && (
-        <p
-          role="alert"
-          className="rounded-sm border border-falha/25 bg-falha-suave px-3 py-2 text-xs text-falha"
-        >
-          {erro}
-        </p>
-      )}
-
-      {/* Barra de publicação. Fixa no rodapé: a decisão de publicar precisa estar
-          sempre à mão enquanto a pessoa ajusta os controles. */}
-      <div className="area-segura-base sticky bottom-0 -mx-4 border-t border-linha bg-superficie/95 px-4 py-3 backdrop-blur md:-mx-8 md:px-8">
+      {/* Barra de publicação. Fixa no rodapé: a decisão de publicar precisa
+          estar sempre à mão enquanto a pessoa ajusta os controles. */}
+      <div className="sticky bottom-[calc(3.75rem+env(safe-area-inset-bottom))] z-10 mt-6 -mx-4 border-y border-linha-firme bg-superficie px-4 py-3 shadow-[0_-4px_16px_-6px_rgb(28_24_18/0.12)] md:-mx-8 md:bottom-0 md:border-b-0 md:px-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="text-xs">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
             {configuracao.publicada === null ? (
               <span className="text-texto-3">Ainda não publicado. Os clientes veem o padrão.</span>
             ) : naoPublicado ? (
@@ -228,10 +240,11 @@ export function FormularioAgente({
                 {configuracao.publicadaEm && ` · publicada ${tempoRelativo(configuracao.publicadaEm)}`}
               </span>
             )}
-            <span className="ml-2 text-texto-3">
-              {estado === 'salvando' && 'salvando…'}
-              {estado === 'salvo' && 'rascunho salvo'}
-            </span>
+            {(estado === 'salvando' || estado === 'salvo') && (
+              <span className="text-2xs text-texto-3">
+                · {estado === 'salvando' ? 'salvando rascunho…' : 'rascunho salvo'}
+              </span>
+            )}
           </div>
 
           {podePublicar && (
@@ -250,7 +263,7 @@ export function FormularioAgente({
       </div>
 
       {configuracao.historico.length > 0 && (
-        <section>
+        <section className="mt-6">
           <h2 className="mb-2 text-xs font-medium tracking-[0.04em] text-texto-3 uppercase">
             Histórico
           </h2>
@@ -317,10 +330,12 @@ function Escala({
   return (
     <div className="grid gap-1.5">
       <span className="text-xs font-medium text-texto-2">{rotulo}</span>
+      {/* Controle segmentado: os botões dividem borda para ler como um espectro
+          da esquerda para a direita, não três opções soltas. */}
       <div
         role="radiogroup"
         aria-label={rotulo}
-        className="flex gap-1.5"
+        className="flex overflow-hidden rounded-sm border border-linha-firme"
       >
         {posicoes.map((posicao, i) => (
           <button
@@ -331,11 +346,11 @@ function Escala({
             disabled={desabilitado}
             onClick={() => onChange(posicao)}
             className={cn(
-              'flex-1 rounded-sm border px-2 py-1.5 text-xs font-medium transition-colors duration-[120ms]',
+              'flex-1 border-l border-linha px-2 py-1.5 text-xs font-medium transition-colors duration-[var(--dur-controle)] first:border-l-0',
               'max-md:min-h-11 disabled:opacity-50',
               atual === i
-                ? 'border-marca bg-marca-suave text-marca'
-                : 'border-linha-firme bg-superficie text-texto-2 hover:bg-superficie-2',
+                ? 'bg-marca-suave text-marca'
+                : 'bg-superficie text-texto-2 hover:bg-superficie-2',
             )}
           >
             {descricoes[i]}

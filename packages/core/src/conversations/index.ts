@@ -12,9 +12,11 @@ export {
 } from './atendimento.ts';
 
 export {
+  contarConversas,
   detalharConversa,
   listarConversas,
   marcarComoLida,
+  type ContagemInbox,
   type DetalheConversa,
   type FiltrosInbox,
   type FiltroStatus,

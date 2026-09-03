@@ -82,6 +82,12 @@
 
   --ease-saida: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-padrao: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Durações nomeadas pelo que a coisa faz, não pelo número. Retorno de
+     controle é quase instantâneo; camada que entra tem tempo de ser vista. */
+  --dur-controle: 120ms;
+  --dur-estado: 180ms;
+  --dur-camada: 240ms;
 }
 
 /* ─── Tema claro — papel quente com tinta ─────────────────────────────────── */
@@ -347,18 +353,111 @@
     user-select: none;
   }
 
-  /* Regiões de rolagem próprias, em vez de a página inteira rolar como site. */
-  .rolagem {
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    -webkit-overflow-scrolling: touch;
-  }
-
   .area-segura-topo {
     padding-top: env(safe-area-inset-top);
   }
 
   .area-segura-base {
     padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/*
+  Região de rolagem própria, em vez de a página inteira rolar como site.
+
+  Declarada com `@utility` — e não como classe solta dentro de `@layer
+  utilities` — porque precisa aceitar variante: no desktop o console trava a
+  janela e cada tela rola por dentro (`md:rolagem`), enquanto no celular a
+  página rola inteira. Classe escrita à mão em `@layer` não gera `md:`.
+*/
+@utility rolagem {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ─── Entrada de conteúdo ─────────────────────────────────────────────────── */
+
+/*
+  Uma tela do console entra com um gesto só: o conteúdo sobe 6 px e ganha
+  opacidade, a partir de um estado já quase visível — nada aparece "do nada"
+  com atraso encadeado. `--atraso` escalona seções irmãs sem cascata de JS.
+
+  Só entra quem está acima da dobra na carga; ao rolar, nada se move (regra do
+  DESIGN.md). Por isso a animação roda uma vez, no mount, e não em scroll.
+*/
+@layer utilities {
+  @keyframes entra-subindo {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  .entra {
+    animation: entra-subindo var(--dur-camada) var(--ease-saida) both;
+    animation-delay: var(--atraso, 0ms);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .entra {
+      animation: none;
+    }
+  }
+
+  /* Valor que muda ao vivo pisca de leve no token da marca — comunica "isto
+     acabou de mudar" sem contador animado. */
+  @keyframes realce-vivo {
+    from {
+      background-color: var(--cor-marca-suave);
+    }
+    to {
+      background-color: transparent;
+    }
+  }
+
+  .realce-vivo {
+    animation: realce-vivo 900ms var(--ease-saida);
+  }
+
+  @keyframes brilho {
+    to {
+      transform: translateX(100%);
+    }
+  }
+
+  @keyframes aparece {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  /* Folha que sobe de baixo — menu e sheet no celular. */
+  @keyframes sobe-de-baixo {
+    from {
+      transform: translateY(100%);
+    }
+    to {
+      transform: none;
+    }
+  }
+
+  /* "Digitando…" — três pontos que respiram. */
+  @keyframes pulso-ponto {
+    0%,
+    60%,
+    100% {
+      opacity: 0.3;
+    }
+    30% {
+      opacity: 1;
+    }
   }
 }

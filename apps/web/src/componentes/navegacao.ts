@@ -2,7 +2,7 @@ import {
   BarChart3,
   FlaskConical,
   BookOpen,
-  Bot,
+  Headset,
   Home,
   Inbox,
   Lightbulb,
@@ -71,7 +71,7 @@ export const NAVEGACAO: ItemNavegacao[] = [
     id: 'agente',
     rotulo: 'Atendente virtual',
     caminho: '/atendente',
-    Icone: Bot,
+    Icone: Headset,
     permissao: 'agente.ver',
   },
   {

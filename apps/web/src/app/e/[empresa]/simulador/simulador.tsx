@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, RotateCcw, Send } from 'lucide-react';
+import { ArrowRight, Eraser, Send } from 'lucide-react';
 import { Botao, cn, Etiqueta } from '@otto/ui';
 
 /**
@@ -127,7 +127,7 @@ export function Simulador({ canalId, empresaSlug }: { canalId: string; empresaSl
             </div>
           </div>
         ) : (
-          <div className="flex flex-col gap-2">
+          <div className="flex min-h-full flex-col justify-end gap-2">
             {falas.map((fala, i) => (
               <div
                 key={i}
@@ -190,6 +190,16 @@ export function Simulador({ canalId, empresaSlug }: { canalId: string; empresaSl
                 )}
               </div>
             ))}
+
+            {enviando && (
+              <div className="flex justify-start">
+                <div className="flex items-center gap-1 rounded-md rounded-tl-xs bg-superficie-2 px-3 py-2.5">
+                  <span className="size-1.5 animate-[pulso-ponto_1.2s_ease-in-out_infinite] rounded-full bg-texto-3" />
+                  <span className="size-1.5 animate-[pulso-ponto_1.2s_ease-in-out_0.15s_infinite] rounded-full bg-texto-3" />
+                  <span className="size-1.5 animate-[pulso-ponto_1.2s_ease-in-out_0.3s_infinite] rounded-full bg-texto-3" />
+                </div>
+              </div>
+            )}
             <div ref={fim} />
           </div>
         )}
@@ -202,8 +212,8 @@ export function Simulador({ canalId, empresaSlug }: { canalId: string; empresaSl
             aria-label="Limpar conversa"
             title="Limpar a conversa desta tela"
             onClick={() => setFalas([])}
-            className="size-9 shrink-0 px-0 max-md:size-11"
-            icone={<RotateCcw strokeWidth={1.5} />}
+            className="size-9 shrink-0 px-0 text-texto-3 max-md:size-11"
+            icone={<Eraser strokeWidth={1.5} />}
           />
         )}
 

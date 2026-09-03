@@ -1,10 +1,9 @@
 import type { Metadata } from 'next';
-import { AlertCircle, MapPin, Users2 } from 'lucide-react';
-import { Etiqueta } from '@otto/ui';
+import { AtSign, MapPin, MessageCircle, FlaskConical } from 'lucide-react';
+import { Cartao, Etiqueta, formatarTelefone, tempoRelativo } from '@otto/ui';
 
 import { ROTULO_PAPEL, pode } from '@otto/core/auth';
 import {
-  and,
   asc,
   channels,
   desc,
@@ -17,14 +16,15 @@ import {
 } from '@otto/db';
 
 import { exigirAcesso } from '@/servidor/sessao.ts';
+import { Pagina } from '@/componentes/pagina.tsx';
 
 export const metadata: Metadata = { title: 'Configurações' };
 
-const ROTULO_CANAL: Record<string, string> = {
-  whatsapp: 'WhatsApp',
-  instagram: 'Instagram Direct',
-  simulador: 'Canal de teste',
-};
+const CANAL = {
+  whatsapp: { rotulo: 'WhatsApp', Icone: MessageCircle },
+  instagram: { rotulo: 'Instagram Direct', Icone: AtSign },
+  simulador: { rotulo: 'Canal de teste', Icone: FlaskConical },
+} as const;
 
 const TOM_CANAL: Record<string, 'ok' | 'atencao' | 'falha' | 'neutro'> = {
   conectado: 'ok',
@@ -34,13 +34,39 @@ const TOM_CANAL: Record<string, 'ok' | 'atencao' | 'falha' | 'neutro'> = {
   nao_conectado: 'neutro',
 };
 
-const ROTULO_STATUS_CANAL: Record<string, string> = {
+const STATUS_CANAL: Record<string, string> = {
   conectado: 'Conectado',
   degradado: 'Instável',
   pausado: 'Pausado',
   desconectado: 'Desconectado',
   nao_conectado: 'Não conectado',
 };
+
+/** `America/Belem` → `Belém (GMT-3)`. IANA cru é jargão para quem toca uma loja. */
+function fusoAmigavel(iana: string | null | undefined): string {
+  if (!iana) return '—';
+  const cidade = iana.split('/').at(-1)?.replace(/_/g, ' ') ?? iana;
+  const nomes: Record<string, string> = {
+    Belem: 'Belém',
+    Sao_Paulo: 'São Paulo',
+    Fortaleza: 'Fortaleza',
+    Manaus: 'Manaus',
+    Recife: 'Recife',
+    Cuiaba: 'Cuiabá',
+  };
+  const chave = iana.split('/').at(-1) ?? '';
+  const offsets: Record<string, string> = {
+    'America/Belem': 'GMT-3',
+    'America/Fortaleza': 'GMT-3',
+    'America/Recife': 'GMT-3',
+    'America/Sao_Paulo': 'GMT-3',
+    'America/Manaus': 'GMT-4',
+    'America/Cuiaba': 'GMT-4',
+  };
+  const nome = nomes[chave] ?? cidade;
+  const off = offsets[iana];
+  return off ? `${nome} (${off})` : nome;
+}
 
 export default async function PaginaConfiguracoes({
   params,
@@ -96,7 +122,6 @@ export default async function PaginaConfiguracoes({
         nome: users.name,
         email: users.email,
         papel: memberships.role,
-        ativo: memberships.isActive,
       })
       .from(memberships)
       .innerJoin(users, eq(users.id, memberships.userId))
@@ -106,23 +131,33 @@ export default async function PaginaConfiguracoes({
     return { empresa, unidades, canais, equipe };
   });
 
+  const podeConvidar = pode(acesso, 'usuario.convidar');
+
   return (
-    <div className="mx-auto max-w-3xl px-4 py-5 md:px-8 md:py-8">
-      <header className="mb-6">
-        <h1 className="text-xl font-semibold tracking-[-0.015em] text-texto">Configurações</h1>
-        <p className="mt-0.5 text-sm text-texto-2">
-          Dados da empresa, unidades, canais e equipe.
-        </p>
+    <Pagina largura="padrao">
+      <header className="entra mb-5">
+        <h1 className="text-texto text-xl font-semibold tracking-[-0.015em]">Configurações</h1>
+        <p className="text-texto-2 mt-0.5 text-sm">Dados da empresa, unidades, canais e equipe.</p>
       </header>
 
-      <div className="grid gap-7">
-        <Secao titulo="Empresa">
+      {/*
+        Quatro assuntos independentes, nenhum longo. Empilhados numa coluna de
+        leitura sobrava tela dos dois lados e obrigava a rolar por algo que cabe
+        de uma vez; lado a lado, a tela inteira é a página. `items-start` impede
+        que o cartão curto herde a altura do vizinho.
+      */}
+      <div className="grid items-start gap-4 lg:grid-cols-2">
+        <Cartao
+          titulo="Empresa"
+          className="entra"
+          style={{ '--atraso': '40ms' } as React.CSSProperties}
+        >
           <dl className="grid gap-0">
             <Linha rotulo="Nome" valor={dados.empresa?.nome ?? '—'} />
             {dados.empresa?.razaoSocial && (
               <Linha rotulo="Razão social" valor={dados.empresa.razaoSocial} />
             )}
-            <Linha rotulo="Fuso horário" valor={dados.empresa?.fuso ?? '—'} />
+            <Linha rotulo="Fuso horário" valor={fusoAmigavel(dados.empresa?.fuso)} />
             <Linha
               rotulo="Situação"
               valor={
@@ -132,30 +167,35 @@ export default async function PaginaConfiguracoes({
               }
             />
           </dl>
-        </Secao>
+        </Cartao>
 
-        <Secao
+        <Cartao
           titulo="Unidades"
-          descricao="Endereço e horário saem daqui — é o que o atendente virtual responde quando perguntam onde fica e que horas abre."
+          descricao="Endereço e horário saem daqui — é o que a Bia responde quando perguntam onde fica e que horas abre."
+          className="entra"
+          style={{ '--atraso': '80ms' } as React.CSSProperties}
+          semPreenchimento
         >
           {dados.unidades.length === 0 ? (
             <Aviso
               icone={<MapPin />}
-              texto="Nenhuma unidade cadastrada. Sem isso, o atendente virtual não consegue informar endereço nem horário, e encaminha essas perguntas para a equipe."
+              texto="Nenhuma unidade cadastrada. Sem isso, a Bia não informa endereço nem horário, e encaminha essas perguntas para a equipe."
             />
           ) : (
-            <ul>
+            <ul className="divide-linha divide-y">
               {dados.unidades.map((u) => (
-                <li
-                  key={u.id}
-                  className="flex flex-wrap items-start gap-2 border-b border-linha px-3 py-2.5 last:border-0"
-                >
+                <li key={u.id} className="flex items-start gap-3 px-4 py-2.5">
+                  <MapPin
+                    aria-hidden
+                    strokeWidth={1.5}
+                    className={`mt-0.5 size-4 shrink-0 ${u.principal ? 'text-marca' : 'text-texto-3'}`}
+                  />
                   <div className="min-w-0 flex-1">
-                    <p className="flex items-center gap-2 text-sm font-medium text-texto">
+                    <p className="text-texto flex items-center gap-2 text-sm font-medium">
                       {u.nome}
                       {u.principal && <Etiqueta tom="marca">Principal</Etiqueta>}
                     </p>
-                    <p className="mt-0.5 text-2xs text-texto-3">
+                    <p className="text-2xs text-texto-3 mt-0.5">
                       {[
                         u.rua && u.numero ? `${u.rua}, ${u.numero}` : u.rua,
                         u.bairro,
@@ -163,114 +203,112 @@ export default async function PaginaConfiguracoes({
                       ]
                         .filter(Boolean)
                         .join(' · ') || 'endereço não informado'}
-                      {u.telefone && ` · ${u.telefone}`}
+                      {u.telefone && ` · ${formatarTelefone(u.telefone)}`}
                     </p>
                   </div>
                 </li>
               ))}
             </ul>
           )}
-        </Secao>
+        </Cartao>
 
-        <Secao titulo="Canais">
+        <Cartao
+          titulo="Canais"
+          descricao="Por onde as mensagens dos clientes chegam."
+          className="entra"
+          style={{ '--atraso': '120ms' } as React.CSSProperties}
+          semPreenchimento
+        >
           {dados.canais.length === 0 ? (
             <Aviso
-              icone={<AlertCircle />}
+              icone={<MessageCircle />}
               texto="Nenhum canal conectado. Sem um canal, nenhuma mensagem chega ao produto."
             />
           ) : (
-            <ul>
-              {dados.canais.map((c) => (
-                <li
-                  key={c.id}
-                  className="flex flex-wrap items-center gap-2 border-b border-linha px-3 py-2.5 last:border-0"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-texto">{c.nome}</p>
-                    <p className="mt-0.5 text-2xs text-texto-3">
-                      {ROTULO_CANAL[c.tipo] ?? c.tipo}
-                      {c.identificador && ` · ${c.identificador}`}
-                    </p>
-                  </div>
-                  <Etiqueta tom={TOM_CANAL[c.status] ?? 'neutro'} ponto>
-                    {ROTULO_STATUS_CANAL[c.status] ?? c.status}
-                  </Etiqueta>
-                </li>
-              ))}
+            <ul className="divide-linha divide-y">
+              {dados.canais.map((c) => {
+                const info = CANAL[c.tipo as keyof typeof CANAL] ?? {
+                  rotulo: c.tipo,
+                  Icone: MessageCircle,
+                };
+                return (
+                  <li key={c.id} className="flex items-center gap-3 px-4 py-2.5">
+                    <span className="bg-superficie-2 text-texto-3 flex size-8 shrink-0 items-center justify-center rounded-full">
+                      <info.Icone aria-hidden strokeWidth={1.5} className="size-4" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-texto text-sm font-medium">{c.nome}</p>
+                      <p className="text-2xs text-texto-3 mt-0.5">
+                        {info.rotulo}
+                        {c.identificador && ` · ${c.identificador}`}
+                        {c.ultimoEvento && ` · ativo ${tempoRelativo(c.ultimoEvento)}`}
+                      </p>
+                    </div>
+                    <Etiqueta tom={TOM_CANAL[c.status] ?? 'neutro'} ponto>
+                      {STATUS_CANAL[c.status] ?? c.status}
+                    </Etiqueta>
+                  </li>
+                );
+              })}
             </ul>
           )}
-        </Secao>
+        </Cartao>
 
-        <Secao titulo="Equipe">
-          {dados.equipe.length === 0 ? (
-            <Aviso icone={<Users2 />} texto="Nenhuma pessoa com acesso além de você." />
-          ) : (
-            <ul>
-              {dados.equipe.map((p) => (
-                <li
-                  key={p.id}
-                  className="flex flex-wrap items-center gap-2 border-b border-linha px-3 py-2.5 last:border-0"
+        <Cartao
+          titulo="Equipe"
+          descricao={`${dados.equipe.length} ${dados.equipe.length === 1 ? 'pessoa com acesso' : 'pessoas com acesso'} ao painel.`}
+          className="entra"
+          style={{ '--atraso': '160ms' } as React.CSSProperties}
+          semPreenchimento
+        >
+          <ul className="divide-linha divide-y">
+            {dados.equipe.map((p) => (
+              <li key={p.id} className="flex items-center gap-3 px-4 py-2.5">
+                <span
+                  aria-hidden
+                  className="bg-superficie-3 text-texto-2 flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-medium"
                 >
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-texto">{p.nome}</p>
-                    <p className="truncate text-2xs text-texto-3">{p.email}</p>
-                  </div>
-                  <Etiqueta tom={p.papel === 'proprietario' ? 'marca' : 'neutro'}>
-                    {ROTULO_PAPEL[p.papel].nome}
-                  </Etiqueta>
-                </li>
-              ))}
-            </ul>
-          )}
+                  {p.nome.trim().charAt(0).toUpperCase()}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-texto truncate text-sm font-medium">{p.nome}</p>
+                  <p className="text-2xs text-texto-3 truncate">{p.email}</p>
+                </div>
+                <Etiqueta tom={p.papel === 'proprietario' ? 'marca' : 'neutro'}>
+                  {ROTULO_PAPEL[p.papel].nome}
+                </Etiqueta>
+              </li>
+            ))}
+          </ul>
 
-          {pode(acesso, 'usuario.convidar') && (
-            <p className="border-t border-linha px-3 py-2.5 text-2xs text-texto-3">
+          {podeConvidar && (
+            <p className="border-linha text-2xs text-texto-3 border-t px-4 py-3">
               O convite de novas pessoas por e-mail entra junto com o envio de e-mails
               transacionais. Até lá, o acesso é criado por nós.
             </p>
           )}
-        </Secao>
+        </Cartao>
       </div>
-    </div>
-  );
-}
-
-function Secao({
-  titulo,
-  descricao,
-  children,
-}: {
-  titulo: string;
-  descricao?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section>
-      <h2 className="mb-1 text-xs font-medium tracking-[0.04em] text-texto-3 uppercase">
-        {titulo}
-      </h2>
-      {descricao && <p className="mb-2 max-w-[64ch] text-xs text-texto-3">{descricao}</p>}
-      <div className="overflow-hidden rounded-md border border-linha bg-superficie">{children}</div>
-    </section>
+    </Pagina>
   );
 }
 
 function Linha({ rotulo, valor }: { rotulo: string; valor: React.ReactNode }) {
   return (
-    <div className="flex items-center gap-3 border-b border-linha px-3 py-2.5 last:border-0">
-      <dt className="text-xs text-texto-2">{rotulo}</dt>
-      <dd className="ml-auto text-sm text-texto">{valor}</dd>
+    <div className="border-linha grid gap-x-4 gap-y-0.5 border-b py-2 first:pt-0 last:border-0 last:pb-0 sm:grid-cols-[10rem_1fr] sm:items-center">
+      <dt className="text-texto-3 sm:text-texto-2 text-xs">{rotulo}</dt>
+      <dd className="text-texto text-sm">{valor}</dd>
     </div>
   );
 }
 
 function Aviso({ icone, texto }: { icone: React.ReactNode; texto: string }) {
   return (
-    <div className="flex items-start gap-2.5 px-3 py-3">
-      <span aria-hidden className="mt-0.5 text-texto-3 [&>svg]:size-4 [&>svg]:stroke-[1.5]">
+    <div className="flex items-start gap-2.5 px-4 py-3.5">
+      <span aria-hidden className="text-texto-3 mt-0.5 [&>svg]:size-4 [&>svg]:stroke-[1.5]">
         {icone}
       </span>
-      <p className="max-w-[64ch] text-xs text-texto-2">{texto}</p>
+      <p className="text-texto-2 max-w-[64ch] text-xs">{texto}</p>
     </div>
   );
 }

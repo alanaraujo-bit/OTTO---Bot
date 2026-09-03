@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
 import {
+  contarConversas,
   detalharConversa,
   listarConversas,
   marcarComoLida,
@@ -28,10 +29,10 @@ export default async function PaginaConversa({
   searchParams,
 }: {
   params: Promise<{ empresa: string; conversa: string }>;
-  searchParams: Promise<{ status?: string }>;
+  searchParams: Promise<{ status?: string; busca?: string }>;
 }) {
   const { empresa: slug, conversa: conversaId } = await params;
-  const { status } = await searchParams;
+  const { status, busca } = await searchParams;
   const acesso = await exigirAcesso(slug);
 
   const detalhe = await detalharConversa(acesso.empresa.id, conversaId);
@@ -44,16 +45,21 @@ export default async function PaginaConversa({
   }
 
   const filtro = (status as FiltroStatus) ?? 'abertas';
-  const conversas = await listarConversas(acesso.empresa.id, { status: filtro });
+  const [conversas, contagem] = await Promise.all([
+    listarConversas(acesso.empresa.id, { status: filtro, busca }),
+    contarConversas(acesso.empresa.id),
+  ]);
 
   return (
     <div className="flex h-full min-h-0">
-      <div className="hidden min-h-0 w-[21rem] shrink-0 flex-col border-r border-linha md:flex">
+      <div className="hidden min-h-0 w-[21rem] shrink-0 flex-col border-r border-linha md:flex lg:w-[24rem]">
         <ListaConversas
           conversas={conversas}
+          contagem={contagem}
           empresaSlug={slug}
           conversaAtiva={conversaId}
           filtroAtual={filtro}
+          buscaAtual={busca}
         />
       </div>
 

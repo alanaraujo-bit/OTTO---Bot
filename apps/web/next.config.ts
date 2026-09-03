@@ -43,6 +43,9 @@ carregarEnvDaRaiz();
 
 const config: NextConfig = {
   reactStrictMode: true,
+  // O selo de desenvolvimento cobre o rodapé da barra lateral e polui inspeção
+  // visual; não muda nada em produção, onde ele já não existe.
+  devIndicators: false,
   // Os pacotes do monorepo são TypeScript puro, sem build próprio.
   transpilePackages: ['@otto/ui', '@otto/core', '@otto/db', '@otto/shared'],
   // Empacota só o que o servidor usa para a imagem Docker do Railway. O

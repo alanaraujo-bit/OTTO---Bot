@@ -1,10 +1,19 @@
 'use client';
 
-import { useEffect, useOptimistic, useRef, useState, useTransition } from 'react';
+import { Fragment, useEffect, useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { AlertCircle, ArrowLeft, Bot, Check, CheckCheck, Clock, Send, UserRound } from 'lucide-react';
-import { Botao, cn, Etiqueta } from '@otto/ui';
+import {
+  AlertCircle,
+  ArrowLeft,
+  Check,
+  CheckCheck,
+  Clock,
+  RotateCcw,
+  Send,
+  UserRound,
+} from 'lucide-react';
+import { Botao, cn, Etiqueta, formatarTelefone } from '@otto/ui';
 
 import type { DetalheConversa, MensagemDaConversa } from '@otto/core/conversations';
 import {
@@ -59,7 +68,7 @@ export function PainelConversa({
   return (
     <div className="flex h-full min-h-0 flex-col">
       {/* ── Cabeçalho ──────────────────────────────────────────────────────── */}
-      <header className="flex items-center gap-3 border-b border-linha bg-superficie px-3 py-2.5">
+      <header className="area-segura-topo flex items-center gap-2.5 border-b border-linha bg-superficie px-3 py-2.5">
         <Link
           href={`/e/${empresaSlug}/conversas`}
           aria-label="Voltar para a lista"
@@ -68,13 +77,25 @@ export function PainelConversa({
           <ArrowLeft aria-hidden strokeWidth={1.5} className="size-4" />
         </Link>
 
+        <span
+          aria-hidden
+          className={cn(
+            'flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-medium',
+            conversa.status === 'aguardando_humano'
+              ? 'bg-atencao-suave text-atencao'
+              : 'bg-superficie-3 text-texto-2',
+          )}
+        >
+          {(conversa.contato.nome ?? '?').trim().charAt(0).toUpperCase()}
+        </span>
+
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold text-texto">
             {conversa.contato.nome ?? 'Contato sem nome'}
           </p>
           <p className="truncate text-2xs text-texto-3">
             {conversa.canal.nome}
-            {conversa.contato.telefone && ` · ${conversa.contato.telefone}`}
+            {conversa.contato.telefone && ` · ${formatarTelefone(conversa.contato.telefone)}`}
           </p>
         </div>
 
@@ -86,7 +107,7 @@ export function PainelConversa({
           )}
           {iaAtiva ? (
             <Etiqueta tom="marca" ponto>
-              IA atendendo
+              Bia atendendo
             </Etiqueta>
           ) : conversa.atribuidaA ? (
             <Etiqueta tom="neutro">{minha ? 'Você' : conversa.atribuidaA.nome}</Etiqueta>
@@ -102,11 +123,11 @@ export function PainelConversa({
               <Botao
                 tamanho="sm"
                 variante="secundaria"
-                icone={<Bot strokeWidth={1.5} />}
+                icone={<RotateCcw strokeWidth={1.5} />}
                 disabled={pendente}
                 onClick={() => agir(() => acaoDevolver(empresaSlug, conversa.id))}
               >
-                Devolver para a IA
+                Devolver para a Bia
               </Botao>
             ) : (
               <Botao
@@ -173,13 +194,47 @@ function Historico({ mensagens }: { mensagens: MensagemDaConversa[] }) {
   }
 
   return (
-    <div className="rolagem min-h-0 flex-1 px-3 py-4">
+    <div className="rolagem min-h-0 flex-1 bg-fundo px-3 py-4">
       <div className="mx-auto flex max-w-2xl flex-col gap-2">
-        {mensagens.map((m) => (
-          <Bolha key={m.id} mensagem={m} />
-        ))}
+        {mensagens.map((m, i) => {
+          const anterior = mensagens[i - 1];
+          const mostrarData =
+            !anterior || !mesmoDia(anterior.criadaEm, m.criadaEm);
+          return (
+            <Fragment key={m.id}>
+              {mostrarData && <SeparadorDia data={m.criadaEm} />}
+              <Bolha mensagem={m} />
+            </Fragment>
+          );
+        })}
         <div ref={fim} />
       </div>
+    </div>
+  );
+}
+
+function mesmoDia(a: Date, b: Date): boolean {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+function SeparadorDia({ data }: { data: Date }) {
+  const hoje = new Date();
+  const ontem = new Date(hoje.getTime() - 86_400_000);
+  const rotulo = mesmoDia(data, hoje)
+    ? 'Hoje'
+    : mesmoDia(data, ontem)
+      ? 'Ontem'
+      : data.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: undefined });
+
+  return (
+    <div className="my-2 flex items-center justify-center">
+      <span className="rounded-full bg-superficie px-2.5 py-0.5 text-2xs font-medium text-texto-3 shadow-[var(--shadow-suspensa)]">
+        {rotulo}
+      </span>
     </div>
   );
 }
@@ -188,9 +243,25 @@ function Bolha({ mensagem }: { mensagem: MensagemDaConversa }) {
   const doCliente = mensagem.autor === 'cliente';
   const falhou = mensagem.status === 'falhou';
 
+  // Mensagem do sistema não é uma fala — é um registro do que aconteceu no
+  // atendimento. Vai centralizada e discreta, como o separador de dia.
+  if (mensagem.autor === 'sistema') {
+    return (
+      <div className="my-1.5 flex justify-center">
+        <p className="max-w-[85%] rounded-full bg-superficie-2 px-3 py-1 text-center text-2xs text-texto-3">
+          {mensagem.corpo}
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className={cn('flex', doCliente ? 'justify-start' : 'justify-end')}>
-      <div className={cn('max-w-[min(85%,34rem)]', doCliente ? 'items-start' : 'items-end')}>
+      <div
+        className={cn(
+          doCliente ? 'max-w-[78%] items-start md:max-w-[32rem]' : 'max-w-[85%] items-end md:max-w-[34rem]',
+        )}
+      >
         <div
           className={cn(
             'rounded-md px-3 py-2 text-md leading-relaxed',
@@ -213,7 +284,7 @@ function Bolha({ mensagem }: { mensagem: MensagemDaConversa }) {
         >
           {!doCliente && (
             <span>
-              {mensagem.autor === 'agente' ? 'Atendente virtual' : (mensagem.autorNome ?? 'Equipe')}
+              {mensagem.autor === 'agente' ? 'Bia' : (mensagem.autorNome ?? 'Equipe')}
             </span>
           )}
           <time dateTime={mensagem.criadaEm.toISOString()}>

@@ -16,3 +16,11 @@ export {
   type PontoDoDia,
   type ResumoAnalytics,
 } from './analytics.ts';
+
+export {
+  serieUltimosDias,
+  distribuicaoPorHora,
+  faixasDePico,
+  type DiaDaSerie,
+  type HoraDoDia,
+} from './painel.ts';

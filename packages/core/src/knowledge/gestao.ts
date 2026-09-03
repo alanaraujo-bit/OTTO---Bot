@@ -27,16 +27,19 @@ import { indexarItem } from './indexacao.ts';
  * salvar.
  */
 
-export type StatusItem =
-  | 'rascunho'
-  | 'em_aprovacao'
-  | 'publicado'
-  | 'desatualizado'
-  | 'arquivado';
+export type StatusItem = 'rascunho' | 'em_aprovacao' | 'publicado' | 'desatualizado' | 'arquivado';
 
 export interface ItemListado {
   id: string;
   titulo: string;
+  /**
+   * Começo da resposta, em uma linha.
+   *
+   * O título diz do que o item trata; isto diz o que a Bia responde. Numa lista
+   * de conhecimento é a diferença entre reconhecer o assunto e conferir o
+   * conteúdo sem abrir a ficha.
+   */
+  resumo: string;
   tipo: string;
   status: StatusItem;
   categoria: string | null;
@@ -61,39 +64,46 @@ export async function listarItens(
       condicoes.push(sql`${knowledgeItems.title} ilike ${termo}`);
     }
 
-    return tx
-      .select({
-        id: knowledgeItems.id,
-        titulo: knowledgeItems.title,
-        tipo: knowledgeItems.kind,
-        status: knowledgeItems.status,
-        categoria: knowledgeCategories.name,
-        versao: knowledgeItems.version,
-        usos: knowledgeItems.usageCount,
-        ultimoUsoEm: knowledgeItems.lastUsedAt,
-        revisarAte: knowledgeItems.reviewDueAt,
-        atualizadoEm: knowledgeItems.updatedAt,
-        atualizadoPor: users.name,
-      })
-      .from(knowledgeItems)
-      .leftJoin(knowledgeCategories, eq(knowledgeCategories.id, knowledgeItems.categoryId))
-      .leftJoin(users, eq(users.id, knowledgeItems.updatedBy))
-      .where(condicoes.length ? and(...condicoes) : undefined)
-      // Rascunho e "em aprovação" primeiro: são os que pedem ação de alguém.
-      .orderBy(
-        sql`case ${knowledgeItems.status}
+    return (
+      tx
+        .select({
+          id: knowledgeItems.id,
+          titulo: knowledgeItems.title,
+          // Uma linha só: quebras viram espaço e o corte acontece no banco, para a
+          // lista não carregar o corpo inteiro de 200 itens só para mostrar 100
+          // caracteres de cada.
+          resumo: sql<string>`left(regexp_replace(${knowledgeItems.body}, '\\s+', ' ', 'g'), 160)`,
+          tipo: knowledgeItems.kind,
+          status: knowledgeItems.status,
+          categoria: knowledgeCategories.name,
+          versao: knowledgeItems.version,
+          usos: knowledgeItems.usageCount,
+          ultimoUsoEm: knowledgeItems.lastUsedAt,
+          revisarAte: knowledgeItems.reviewDueAt,
+          atualizadoEm: knowledgeItems.updatedAt,
+          atualizadoPor: users.name,
+        })
+        .from(knowledgeItems)
+        .leftJoin(knowledgeCategories, eq(knowledgeCategories.id, knowledgeItems.categoryId))
+        .leftJoin(users, eq(users.id, knowledgeItems.updatedBy))
+        .where(condicoes.length ? and(...condicoes) : undefined)
+        // Rascunho e "em aprovação" primeiro: são os que pedem ação de alguém.
+        .orderBy(
+          sql`case ${knowledgeItems.status}
               when 'em_aprovacao' then 0
               when 'rascunho' then 1
               when 'desatualizado' then 2
               when 'publicado' then 3
               else 4 end`,
-        desc(knowledgeItems.updatedAt),
-      )
-      .limit(200);
+          desc(knowledgeItems.updatedAt),
+        )
+        .limit(200)
+    );
   });
 }
 
-export interface DetalheItem extends ItemListado {
+/** A ficha mostra o corpo inteiro; o `resumo` da lista seria repetição. */
+export interface DetalheItem extends Omit<ItemListado, 'resumo'> {
   corpo: string;
   aliases: string[];
   fonte: string;
@@ -107,10 +117,7 @@ export interface DetalheItem extends ItemListado {
   }[];
 }
 
-export async function detalharItem(
-  tenantId: string,
-  itemId: string,
-): Promise<DetalheItem | null> {
+export async function detalharItem(tenantId: string, itemId: string): Promise<DetalheItem | null> {
   return withTenant(tenantId, async (tx) => {
     const [item] = await tx
       .select({

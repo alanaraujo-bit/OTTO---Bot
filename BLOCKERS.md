@@ -1,19 +1,15 @@
-## Verificação visual pelo navegador — parcialmente bloqueada
+## Verificação visual pelo navegador — contornado nesta sessão
 
-**Situação:** a extensão do Claude para Chrome esteve conectada e validou as
-primeiras telas (acesso, console, dois temas, contraste medido). Depois de uma
-troca de conta durante a sessão, ela desconectou e não voltou.
+**Situação:** a extensão do Claude para Chrome não pareou nesta sessão (troca de
+conta). Em vez de parar, instalei o Playwright no scratchpad e inspecionei
+**todas as 12 telas** (desktop 1440 + iPhone 13 Pro), nos dois temas, lendo cada
+captura com os próprios olhos. Cada tela passou por crítica de um modelo
+separado antes de avançar.
 
-**O que isso custa:** telas construídas depois disso — Inbox, Conhecimento,
-Melhorias — foram validadas por HTML renderizado com sessão real (conteúdo,
-dados, permissões, estados), mas **não** por inspeção visual de pixel. Isso
-significa que alinhamento, truncamento e comportamento em largura de celular
-seguem por conferir nessas telas.
-
-**Para religar, quando puder:** confirme que a extensão está ativa em
-`chrome://extensions`, e que o Chrome está logado no claude.ai com a **mesma
-conta** do Claude Code. Reiniciar o Chrome costuma resolver. Feito isso, peço a
-inspeção visual completa das telas pendentes e corrijo o que aparecer.
+**O que ainda seria útil com a extensão:** inspeção manual ao vivo (hover,
+foco, animação em tempo real). Para religar: confirme a extensão ativa em
+`chrome://extensions` e o Chrome logado no claude.ai com a **mesma conta** do
+Claude Code; reiniciar o Chrome costuma resolver.
 
 ---
 
@@ -23,27 +19,28 @@ O que depende de ação sua e **não pode** ser resolvido daqui. Nada nesta list
 interrompe o resto: cada item registra o que falta, o que já foi construído ao
 redor dele, e o que fazer quando você voltar.
 
-Atualizado em 2026-09-03.
+Atualizado em 2026-09-03 (após o redesenho premium do console).
 
 ---
 
-## B1 · Chave da API da OpenAI — bloqueia a espinha vertical
+## ~~B1 · Chave da API da OpenAI~~ — RESOLVIDO (2026-09-03)
 
-**O que falta:** uma chave de API válida.
+Você forneceu a chave e autorizou. Configurada em `OPENAI_API_KEY` no `.env` da
+raiz. Verificado:
+- `packages/core/src/espinha.test.ts` passa (18/18) — a espinha vertical grava
+  `ai_runs` com custo, modelo e latência reais.
+- O Simulador responde com prosa real da Bia (desambiguação de unidade,
+  fundamentação no Conhecimento, recusa educada quando não sabe). Sign-off
+  visual da tela concluído.
+- O worker foi consertado no mesmo passo: o script `dev` não carregava o `.env`
+  (`apps/worker/package.json`: `tsx watch` → `tsx watch --env-file=../../.env`).
+- Os 7 itens de conhecimento fictícios que faltavam foram indexados e
+  vetorizados (`knowledge_chunks`: 9/9 com embedding).
 
-**Por que não dá para contornar:** o critério de conclusão da espinha vertical é
-uma linha real em `ai_runs` com custo, modelo e latência reais. Um valor simulado
-satisfaria o teste e mentiria sobre o produto.
-
-**O que já existe ao redor:** a camada de orquestração é agnóstica de fornecedor.
-Existe um provedor de teste determinístico (`ProvedorSimulado`) que exercita a
-cadeia inteira — contexto, ferramentas, fundamentação, registro de custo — sem
-chamar ninguém. Trocar para a OpenAI é preencher uma variável de ambiente.
-
-**Quando voltar:**
-1. platform.openai.com → API keys → Create new secret key
-2. Cole o valor em `OPENAI_API_KEY` no `.env` e nas variáveis do Railway
-3. Peça para eu rodar a espinha vertical; mostro a linha de custo real
+Configurada também no Railway (projeto `otto`), via CLI autorizada por você:
+`OPENAI_API_KEY` em `web` e `worker`, nos ambientes `production` e `development`.
+Verificado presente nos quatro. O `web` em produção ainda não tem deploy
+(projeto pré-lançamento) — a variável pega no primeiro deploy.
 
 ---
 
@@ -110,23 +107,23 @@ falha possível neste produto, que existe justamente para não alucinar.
 
 **O que já existe ao redor:** o modelo de dados recebe tudo isso de forma
 estruturada, e o Centro de Conhecimento tem a tela para cadastrar. O ambiente de
-teste usa uma empresa fictícia **declaradamente fictícia**, nunca uma imitação
-do Campeão.
+teste usa uma empresa fictícia **declaradamente fictícia** ("Mercado Modelo"),
+nunca uma imitação do Campeão. O histórico de demonstração dessa empresa é
+regenerado por `packages/db/_backfill_demo.mjs` e `_realismo_demo.mjs` (não
+commitados).
 
 **Quando voltar:** peça ao Sr. Fernando os dados de cada unidade. Eu cadastro,
 ou preparo uma planilha para ele preencher.
 
 ---
 
-## Verificação visual em largura de celular — contornado
+## Menores (não bloqueiam nada) — para o backlog do time
 
-**Situação:** o redimensionamento de janela pela extensão do Chrome não tem
-efeito enquanto a janela está **maximizada**.
-
-**Contorno em uso:** a inspeção mobile é feita por emulação de viewport via CDP,
-que não depende do tamanho da janela. Onde a emulação não cobrir, digo
-explicitamente que a validação mobile ficou pendente em vez de afirmar que
-conferi.
-
-**Se quiser a verificação na janela real:** basta restaurar o Chrome (sair do
-maximizado).
+- **`next lint`** está quebrado no repo inteiro (o Next 16 removeu o comando).
+  Cobertura de lint hoje é zero — vale migrar para ESLint direto.
+- **Fluxo real de "esqueci a senha"** para o dono não técnico: hoje o acesso é
+  administrado por vocês e a tela de entrada encaminha para esse contato.
+  Continua sendo uma necessidade futura.
+- **Edição inline** de Conhecimento e da ficha de Cliente (renomear/anotar): as
+  server actions já existem no core; falta a UI. O botão "Novo item" foi retirado
+  do Conhecimento até lá.

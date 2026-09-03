@@ -26,21 +26,25 @@ export default async function PaginaAtendente({
   const config = await lerConfiguracao(acesso.empresa.id);
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-5 md:px-8 md:py-8">
-      <header className="mb-6">
-        <h1 className="text-xl font-semibold tracking-[-0.015em] text-texto">Atendente virtual</h1>
-        <p className="mt-0.5 max-w-[64ch] text-sm text-texto-2">
-          Como o atendimento automático conversa com seus clientes. As mudanças só valem depois de
-          publicadas.
-        </p>
-      </header>
+    <div className="md:rolagem md:h-full">
+      <div className="mx-auto max-w-[74rem] px-4 pt-5 pb-24 md:px-8 md:pt-7">
+        <header className="entra mb-5">
+          <h1 className="text-texto text-xl font-semibold tracking-[-0.015em]">
+            Atendente virtual
+          </h1>
+          <p className="text-texto-2 mt-0.5 text-sm">
+            Como a Bia conversa com seus clientes. Você ajusta o jeito; o que ela responde vem
+            sempre do Conhecimento. As mudanças só valem depois de publicadas.
+          </p>
+        </header>
 
-      <FormularioAgente
-        empresaSlug={slug}
-        configuracao={config}
-        podeEditar={pode(acesso, 'agente.editar')}
-        podePublicar={pode(acesso, 'agente.publicar')}
-      />
+        <FormularioAgente
+          empresaSlug={slug}
+          configuracao={config}
+          podeEditar={pode(acesso, 'agente.editar')}
+          podePublicar={pode(acesso, 'agente.publicar')}
+        />
+      </div>
     </div>
   );
 }

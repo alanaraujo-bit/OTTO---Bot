@@ -11,9 +11,12 @@ import { cn, marca } from '@otto/ui';
 export function Assinatura({
   className,
   tamanho = 'md',
+  apenasMarca = false,
 }: {
   className?: string;
   tamanho?: 'sm' | 'md';
+  /** Só o desenho, sem o nome — para a barra lateral recolhida. */
+  apenasMarca?: boolean;
 }) {
   const sm = tamanho === 'sm';
 
@@ -26,14 +29,16 @@ export function Assinatura({
         <span className="w-[3px] rounded-[1px] bg-marca" style={{ height: '100%' }} />
         <span className="w-[3px] rounded-[1px] bg-marca/40" style={{ height: '62%' }} />
       </span>
-      <span
-        className={cn(
-          'font-semibold tracking-[-0.01em] text-texto',
-          sm ? 'text-sm' : 'text-base',
-        )}
-      >
-        {marca.nome}
-      </span>
+      {!apenasMarca && (
+        <span
+          className={cn(
+            'font-semibold tracking-[-0.01em] text-texto',
+            sm ? 'text-sm' : 'text-base',
+          )}
+        >
+          {marca.nome}
+        </span>
+      )}
     </div>
   );
 }
