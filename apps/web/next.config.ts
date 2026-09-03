@@ -45,8 +45,10 @@ const config: NextConfig = {
   reactStrictMode: true,
   // Os pacotes do monorepo são TypeScript puro, sem build próprio.
   transpilePackages: ['@otto/ui', '@otto/core', '@otto/db', '@otto/shared'],
-  // Empacota só o que o servidor usa — necessário para o deploy no Railway.
-  output: 'standalone',
+  // Empacota só o que o servidor usa para a imagem Docker do Railway. O
+  // adaptador do Vercel já cuida do empacotamento próprio e não aceita o
+  // manifesto standalone do Next.
+  ...(process.env.VERCEL ? {} : { output: 'standalone' }),
   poweredByHeader: false,
   serverExternalPackages: ['pg', '@node-rs/argon2', 'pino', 'pino-pretty'],
 };
