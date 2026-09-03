@@ -27,3 +27,5 @@
 {"quando":"2026-09-03T03:45:00.000Z","texto":"Bug grave de fuso horário corrigido","detalhe":"O dia local retornava meia-noite UTC: toda métrica diária contava o dia errado. new Date(string) usa o fuso do processo"}
 {"quando":"2026-09-03T03:55:00.000Z","texto":"Backoffice do SaaS no ar","detalhe":"Alarmes primeiro; detectou 30 envios travados de verdade e o reenfileiramento entregou todos"}
 {"quando":"2026-09-03T04:00:00.000Z","texto":"Bug silencioso: subconsulta correlacionada sem tabela qualificada","detalhe":"Drizzle renderiza a coluna como \"id\"; a correlação não acontecia e o zero parecia 'sem dados ainda'"}
+{"quando":"2026-09-03T04:10:00.000Z","texto":"Aplicação no ar no Railway","detalhe":"web-development-ef04.up.railway.app — banco em 14ms pela rede privada, contra 1s pelo proxy"}
+{"quando":"2026-09-03T04:12:00.000Z","texto":"Simulador de conversa na interface","detalhe":"Conversar como cliente e ver se a IA respondeu ou encaminhou, e por quê"}

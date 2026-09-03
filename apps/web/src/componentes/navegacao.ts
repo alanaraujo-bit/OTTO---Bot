@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  FlaskConical,
   BookOpen,
   Bot,
   Home,
@@ -80,6 +81,13 @@ export const NAVEGACAO: ItemNavegacao[] = [
     Icone: BarChart3,
     permissao: 'analytics.ver',
     noCelular: true,
+  },
+  {
+    id: 'simulador',
+    rotulo: 'Simulador',
+    caminho: '/simulador',
+    Icone: FlaskConical,
+    permissao: 'agente.ver',
   },
   {
     id: 'config',
