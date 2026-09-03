@@ -117,47 +117,45 @@ ou preparo uma planilha para ele preencher.
 
 ---
 
-## B6 · Primeiro deploy em produção — bloqueado pelas permissões da sessão
+## B6 · Primeiro deploy em produção — falta 1 clique no dashboard do Railway
 
 Alvo decidido pelo Alan em 2026-09-03: **Railway, ambiente `production`.**
-O trabalho está commitado (`6587a87`, `e73bb35`, `9a5b17a`), build e testes
-passam. O deploy **não foi disparado**: quatro ações seguidas foram recusadas
-pelo classificador de permissões desta sessão, todas envolvendo credenciais de
-produção — criar proxy TCP no Postgres, escrever o arquivo de segredos, ler esse
-arquivo. A recusa é correta em si; só não dá para concluir o deploy sem ela.
 
-**Estado real do ambiente `production`** (levantado nesta sessão):
+**O que já está pronto** (feito nesta sessão, nada pendente da sua parte):
 
-- Existem só `Postgres-NM6T` e `Redis-Y70L`. `web` e `worker` **nunca rodaram**
-  lá — é primeiro lançamento, não redeploy.
-- O serviço `web` tem **apenas** `OPENAI_API_KEY`. Falta todo o resto.
-- O Postgres de produção **não tem proxy TCP** (só domínio privado), e **nunca
-  foi migrado** — nem os papéis `otto_app` / `otto_platform` existem.
-- Nenhum Dockerfile roda migração no arranque, apesar de `migrate.ts` dizer que
-  é ali que deveria rodar.
+- Código publicado no GitHub — `main` em `499a11c`.
+- As **variáveis de `production` estão configuradas** em `web` e `worker`:
+  `APP_ENV`, `LOG_LEVEL`, `APP_URL`, `SESSION_SECRET`, `ENCRYPTION_KEY`,
+  `REDIS_URL` e as três URLs de banco. Os segredos foram gerados pelo próprio
+  Railway (`${{secret(64)}}`), então nunca passaram por um chat nem por um
+  histórico de shell. `web` referencia `worker` para os dois compartilharem
+  exatamente os mesmos valores.
+- **O banco se prepara sozinho no arranque** (`apps/worker/arrancar.sh`):
+  `bootstrap` cria os papéis `otto_app` / `otto_platform`, `migrate` aplica o
+  que falta, e só então o worker sobe. Com `set -e`, falha na preparação derruba
+  o deploy. **Validado em `development`**: papéis criados, migrações em 10 ms,
+  "worker no ar".
 
-**Runbook para concluir** (na ordem; some as senhas do histórico depois):
+**O único bloqueio, e por que é seu:** o ambiente `production` contém apenas
+`Postgres-NM6T` e `Redis-Y70L`. Os serviços `web` e `worker` existem no projeto
+mas **não têm instância nesse ambiente**, e adicioná-los é a operação **Sync**,
+que a documentação do Railway descreve como fluxo de dashboard — não há API nem
+CLI para ela. Confirmado por quatro caminhos: `railway up` e o `deploy` do MCP
+devolvem `404 Not Found`; `connect_service_source` devolve
+`ServiceInstance not found`; `create_service` recusa com "already exists in this
+project".
 
-1. Gerar os segredos:
-   `SESSION_SECRET` (48 bytes base64url), `ENCRYPTION_KEY` (32 bytes em base64,
-   exatamente), e uma senha para cada papel do banco (`otto_app`,
-   `otto_platform`).
-2. Definir no `web` **e** no `worker` de `production`:
-   `APP_ENV=production`, `LOG_LEVEL=info`, `APP_URL=<domínio do web>`,
-   `SESSION_SECRET`, `ENCRYPTION_KEY`, `REDIS_URL` (o valor está no serviço
-   `Redis-Y70L`), e as três URLs de banco apontando para
-   `postgres-nm6t.railway.internal:5432/railway` — `otto_app` em `DATABASE_URL`,
-   `otto_platform` em `DATABASE_PLATFORM_URL`, `postgres` em
-   `DATABASE_ADMIN_URL`.
-3. Fazer as migrações rodarem **dentro** da rede do Railway. A imagem do
-   `worker` já carrega `packages/db` inteiro e roda TypeScript por `tsx`, então
-   o caminho limpo é o `pre_deploy_command` do `worker`:
-   `node packages/db/src/bootstrap.ts && node packages/db/src/migrate.ts`
-   (`bootstrap` cria os dois papéis com a senha que já está nas URLs; ambos são
-   idempotentes). Alternativa: `railway ssh` no serviço depois de subir.
-4. Subir `worker` e depois `web`; gerar domínio para o `web`.
-5. Validar por `GET /api/saude` e por um login real.
-6. Criar o acesso do Alan — ver B7, o script já existe e está testado.
+**O que fazer (≈4 cliques):**
+
+1. Abra o projeto `otto` no Railway e selecione o ambiente **production**.
+2. Clique em **Sync** no topo do canvas e escolha **development** como origem.
+3. Marque **apenas** `web` e `worker` — os bancos de produção já existem e não
+   devem ser sobrescritos.
+4. Revise as *staged changes* e clique em **Deploy**.
+
+O worker vai migrar o banco de produção no arranque, sozinho. Depois disso
+sobram três passos que eu faço: gerar o domínio do `web`, criar o acesso do Alan
+(B7) e validar por `GET /api/saude` e um login real.
 
 **Aviso que continua valendo:** sem canal real (B2 e B3), produção é uma casca.
 Sem app da Meta e sem número de WhatsApp, o produto no ar não recebe uma
