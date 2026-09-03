@@ -117,3 +117,24 @@ Primeiro fornecedor: OpenAI, com chave própria do operador.
 
 Nome comercial ainda indefinido. Toda a identidade fica em `packages/ui/src/brand.ts`.
 Nenhuma string de marca aparece direto em componente ou copy.
+
+---
+
+## D009 · `otto.aionixdev.com` aponta para o Railway; a Vercel sai de cena
+**2026-09-03 · aceita**
+
+O domínio estava na Vercel e servia o **banco de desenvolvimento** — quem abrisse o
+endereço oficial via a empresa fictícia "Mercado Modelo" e 776 conversas inventadas.
+Num produto que existe para não inventar informação, esse era o pior lugar possível
+para ficção.
+
+O CNAME passou a apontar para o `web` de produção no Railway, com certificado emitido
+e `APP_URL` ajustado nos dois serviços. É a aplicação de D001, não uma decisão nova: o
+console inteiro em uma rede privada só, com uma superfície de log só.
+
+A Vercel fica sem domínio e sem auto-deploy. O projeto continua existindo — se um dia
+aparecer superfície pública de alto tráfego, D001 já prevê que ela vá para lá,
+separada, sem arrastar o console.
+
+*Mudaria se:* o console passasse a ter tráfego anônimo relevante, quando CDN global
+compensaria o custo das três frentes que D001 enumera.
