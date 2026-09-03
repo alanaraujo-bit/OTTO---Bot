@@ -12,14 +12,14 @@
       "id": "identidade",
       "nome": "Identidade visual e design system",
       "resumo": "Tokens, tema claro e escuro, primitivos essenciais",
-      "estado": "em_andamento",
+      "estado": "concluida",
       "criterio": "Login e shell do produto renderizados nos dois temas, sem componente construído sem tela que o use"
     },
     {
       "id": "autenticacao",
       "nome": "Autenticação e sessão",
       "resumo": "Entrar, sessão revogável, seleção de empresa, papéis",
-      "estado": "pendente",
+      "estado": "em_andamento",
       "criterio": "Papel restringe de verdade no servidor, não apenas escondendo botão"
     },
     {

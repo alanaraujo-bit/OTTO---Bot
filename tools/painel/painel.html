@@ -216,17 +216,26 @@
 
       /* ── Pendências ──────────────────────────────────────────────────────── */
 
+      /* Três colunas no desktop: as pendências são importantes, mas empilhadas em
+         largura total elas empurravam o progresso inteiro para baixo da dobra. */
+      #pendencias {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
+        gap: 10px;
+        align-items: start;
+      }
+
+      /* A cor entra pela etiqueta, não por uma faixa lateral grossa — faixa
+         colorida em card é recurso de template. */
       .pendencia {
         border: 1px solid var(--linha-forte);
-        border-left: 2px solid var(--atencao);
         border-radius: var(--raio);
         background: var(--superficie);
-        padding: 14px 16px;
-        margin-bottom: 10px;
+        padding: 13px 15px;
+        min-width: 0;
       }
 
       .pendencia.atendida {
-        border-left-color: var(--ok);
         opacity: 0.62;
       }
 
@@ -253,8 +262,13 @@
 
       .passos div {
         display: grid;
-        grid-template-columns: 78px 1fr;
+        grid-template-columns: 70px minmax(0, 1fr);
         gap: 10px;
+      }
+
+      .passos dd {
+        margin: 0;
+        overflow-wrap: anywhere;
       }
 
       .passos dt {
@@ -405,6 +419,10 @@
         flex: none;
       }
 
+      .linha > .detalhe {
+        flex: 1 1 auto;
+      }
+
       .linha dd {
         margin: 0 0 0 auto;
         font-variant-numeric: tabular-nums;
@@ -427,6 +445,10 @@
       .detalhe {
         color: var(--texto-3);
         font-size: 12px;
+        min-width: 0;
+        /* Mensagem de erro traz caminho e pilha sem espaço: sem isto, ela empurra
+           a largura do bloco e vaza para fora do container. */
+        overflow-wrap: anywhere;
       }
 
       .mono {

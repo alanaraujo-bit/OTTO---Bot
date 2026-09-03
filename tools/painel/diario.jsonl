@@ -5,3 +5,6 @@
 {"quando":"2026-09-03T00:42:00.000Z","texto":"Bug encontrado por teste: política de RLS lançava erro","detalhe":"current_setting devolve string vazia após o primeiro uso na conexão; corrigido com nullif em app_tenant_id()"}
 {"quando":"2026-09-03T00:44:00.000Z","texto":"Isolamento multiempresa provado","detalhe":"14 testes contra banco real: leitura e escrita cruzadas, junções, contexto de usuário e trava para tabela nova sem RLS"}
 {"quando":"2026-09-03T00:52:00.000Z","texto":"Painel de construção no ar","detalhe":"Lê banco, migrações, RLS, testes, commits e código — nada declarado sem fonte verificável"}
+{"quando":"2026-09-03T01:05:00.000Z","texto":"Contexto do produto e identidade visual definidos","detalhe":"PRODUCT.md e DESIGN.md: o mundo visual é instrumento de operação, neutros quentes, IBM Plex auto-hospedada"}
+{"quando":"2026-09-03T01:10:00.000Z","texto":"Design system e primeira tela no ar","detalhe":"Tokens, claro e escuro nativos, botão, campo, etiqueta, vazio, seletor de tema e tela de acesso"}
+{"quando":"2026-09-03T01:12:00.000Z","texto":"Três defeitos achados na inspeção visual","detalhe":"Tailwind ignorava o pacote de UI; contraste terciário reprovado nos dois temas; alvo de toque de 36px no celular"}

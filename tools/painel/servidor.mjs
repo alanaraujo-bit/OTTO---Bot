@@ -239,11 +239,14 @@ async function rodarTestes() {
   testes = { estado: 'rodando', quando: new Date().toISOString() };
   publicar();
 
-  const saidaJson = join(aqui, '.ultimo-teste.json');
+  // Caminho relativo de propósito: a raiz do projeto tem espaço no nome, e com
+  // `shell: true` no Windows um caminho absoluto não citado é partido no espaço.
+  const relativo = '.ultimo-teste.json';
+  const saidaJson = join(raiz, 'packages', 'db', relativo);
   const inicio = Date.now();
   const r = await executar(
     'pnpm',
-    ['exec', 'vitest', 'run', '--reporter=json', `--outputFile=${saidaJson}`],
+    ['exec', 'vitest', 'run', '--reporter=json', `--outputFile=${relativo}`],
     { cwd: join(raiz, 'packages', 'db') },
   );
 
@@ -260,12 +263,21 @@ async function rodarTestes() {
     /* sem relatório: caímos no código de saída */
   }
 
+  // A última linha de erro reconhecível vale mais que 400 caracteres de pilha.
+  const primeiraFalha = (r.erro || r.saida)
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => /error|falhou|failed|cannot|não/i.test(l) && !l.includes('node_modules'))
+    .pop();
+
   testes = {
     estado: r.codigo === 0 ? 'passou' : 'falhou',
     quando: new Date().toISOString(),
     duracaoMs: Date.now() - inicio,
     ...(resumo ?? {}),
-    ...(r.codigo !== 0 && !resumo ? { detalhe: r.erro.slice(-400) || r.saida.slice(-400) } : {}),
+    ...(r.codigo !== 0 && !resumo
+      ? { detalhe: (primeiraFalha ?? 'A suíte não produziu relatório.').slice(0, 240) }
+      : {}),
   };
   rodandoTestes = false;
   publicar();
