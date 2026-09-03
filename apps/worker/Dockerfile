@@ -21,7 +21,10 @@ RUN pnpm install --frozen-lockfile --filter @otto/worker...
 COPY packages ./packages
 COPY apps/worker ./apps/worker
 
+RUN chmod +x apps/worker/arrancar.sh
 RUN addgroup -g 1001 -S nodejs && adduser -S -u 1001 -G nodejs otto && chown -R otto:nodejs /app
 USER otto
 
-CMD ["pnpm", "--filter", "@otto/worker", "start"]
+# O arranque prepara o banco antes de trabalhar; se a preparação falhar, o
+# processo morre e o deploy falha junto. Ver apps/worker/arrancar.sh.
+CMD ["sh", "apps/worker/arrancar.sh"]
