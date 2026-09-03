@@ -117,49 +117,85 @@ ou preparo uma planilha para ele preencher.
 
 ---
 
-## B6 · Primeiro deploy em produção — falta decisão e pré-requisitos
+## B6 · Primeiro deploy em produção — bloqueado pelas permissões da sessão
 
-Pedido em 2026-09-03: "subir tudo para a produção". O trabalho está commitado
-(`6587a87`), build e testes passam, mas **o deploy não foi disparado** porque o
-alvo é ambíguo e o ambiente não está pronto. Nada disso é código a escrever:
+Alvo decidido pelo Alan em 2026-09-03: **Railway, ambiente `production`.**
+O trabalho está commitado (`6587a87`, `e73bb35`, `9a5b17a`), build e testes
+passam. O deploy **não foi disparado**: quatro ações seguidas foram recusadas
+pelo classificador de permissões desta sessão, todas envolvendo credenciais de
+produção — criar proxy TCP no Postgres, escrever o arquivo de segredos, ler esse
+arquivo. A recusa é correta em si; só não dá para concluir o deploy sem ela.
 
-1. **Dois alvos possíveis, e não dá para adivinhar.** Existe projeto na Vercel
-   (`otto-bot`, `prj_1VimSTaFbviYTxrEBNWDlXIXvd4U`) e ambiente `production` no
-   Railway. O último commit anterior era "Ajusta build web para Vercel", mas os
-   deploys reais do Railway saíram por CLI. Qual é a produção de verdade?
-2. **O `production` do Railway nunca rodou a aplicação.** Só existem lá
-   `Postgres-NM6T` e `Redis-Y70L`; `web` e `worker` só têm deploy em
-   `development`. Ou seja, seria o primeiro lançamento, não um redeploy.
-3. **O banco de produção nunca foi migrado.** Subir o `web` contra ele entrega
-   aplicação quebrada. Precisa rodar as migrations antes do primeiro deploy.
-4. **Não consigo conferir as variáveis de produção** (leitura de segredo
-   bloqueada, e está certo assim). Não sei se `DATABASE_URL`, segredo de sessão
-   e afins estão configurados no ambiente de produção.
-5. **Sem canal real, produção é uma casca.** B2 e B3 continuam abertos: sem app
-   da Meta e sem número de WhatsApp, o produto em produção não recebe uma
-   mensagem de cliente sequer.
+**Estado real do ambiente `production`** (levantado nesta sessão):
 
-**Quando voltar:** diga o alvo (Vercel ou Railway `production`). Eu rodo as
-migrations, confiro as variáveis, faço o deploy e valido pelo `/api/saude`.
+- Existem só `Postgres-NM6T` e `Redis-Y70L`. `web` e `worker` **nunca rodaram**
+  lá — é primeiro lançamento, não redeploy.
+- O serviço `web` tem **apenas** `OPENAI_API_KEY`. Falta todo o resto.
+- O Postgres de produção **não tem proxy TCP** (só domínio privado), e **nunca
+  foi migrado** — nem os papéis `otto_app` / `otto_platform` existem.
+- Nenhum Dockerfile roda migração no arranque, apesar de `migrate.ts` dizer que
+  é ali que deveria rodar.
+
+**Runbook para concluir** (na ordem; some as senhas do histórico depois):
+
+1. Gerar os segredos:
+   `SESSION_SECRET` (48 bytes base64url), `ENCRYPTION_KEY` (32 bytes em base64,
+   exatamente), e uma senha para cada papel do banco (`otto_app`,
+   `otto_platform`).
+2. Definir no `web` **e** no `worker` de `production`:
+   `APP_ENV=production`, `LOG_LEVEL=info`, `APP_URL=<domínio do web>`,
+   `SESSION_SECRET`, `ENCRYPTION_KEY`, `REDIS_URL` (o valor está no serviço
+   `Redis-Y70L`), e as três URLs de banco apontando para
+   `postgres-nm6t.railway.internal:5432/railway` — `otto_app` em `DATABASE_URL`,
+   `otto_platform` em `DATABASE_PLATFORM_URL`, `postgres` em
+   `DATABASE_ADMIN_URL`.
+3. Fazer as migrações rodarem **dentro** da rede do Railway. A imagem do
+   `worker` já carrega `packages/db` inteiro e roda TypeScript por `tsx`, então
+   o caminho limpo é o `pre_deploy_command` do `worker`:
+   `node packages/db/src/bootstrap.ts && node packages/db/src/migrate.ts`
+   (`bootstrap` cria os dois papéis com a senha que já está nas URLs; ambos são
+   idempotentes). Alternativa: `railway ssh` no serviço depois de subir.
+4. Subir `worker` e depois `web`; gerar domínio para o `web`.
+5. Validar por `GET /api/saude` e por um login real.
+6. Criar o acesso do Alan — ver B7, o script já existe e está testado.
+
+**Aviso que continua valendo:** sem canal real (B2 e B3), produção é uma casca.
+Sem app da Meta e sem número de WhatsApp, o produto no ar não recebe uma
+mensagem de cliente sequer.
 
 ---
 
-## B7 · Senha do acesso principal — a regra do próprio produto recusa
+## B7 · Senha do acesso principal — RESOLVIDO em desenvolvimento, pendente em produção
 
-Pedido: tornar `alanvitoraraujo1a@outlook.com` / `alan123` o acesso principal.
+Pedido: tornar `alanvitoraraujo1a@outlook.com` o acesso principal, com a senha
+`alan123`.
 
-**O e-mail eu configuro sem problema. A senha não posso usar:** `alan123` tem 7
-caracteres, e a regra de senha do próprio produto
-(`esquemaSenha`, em `packages/core/src/auth/senha.ts`) exige **no mínimo 10**.
-Gravar esse acesso significaria furar a validação do próprio sistema — em
-produção e justamente na conta de proprietário, que é a de maior poder.
+**A senha pedida foi recusada pela regra do próprio produto**, não por
+preferência: `alan123` tem 7 caracteres e `esquemaSenha`
+(`packages/core/src/auth/senha.ts`) exige no mínimo 10. Gravá-la seria furar a
+validação do sistema na conta de maior poder. Com autorização do Alan, foi
+gerada uma frase forte.
 
-Some-se a isso que não existe fluxo de "esqueci a senha" (ver Menores): se essa
-senha vazar, não há autoatendimento para trocá-la.
+**Feito no ambiente de desenvolvimento** (verificado com login real e captura da
+tela de Configurações mostrando "Alan Araújo · Proprietário"):
 
-**Quando voltar:** me passe uma frase de 10+ caracteres, ou me autorize a gerar
-uma forte e te entregar. Aí eu crio o usuário como `proprietario` da empresa e
-confirmo o login.
+- `alanvitoraraujo1a@outlook.com` · **`vento-nuvem-ancora-40`**
+- Papel `proprietario` na empresa `mercado-modelo`.
+
+**Falta em produção:** depende do B6. Quando o ambiente estiver no ar, rodar
+(a partir da raiz, com o `.env` de produção):
+
+```
+node --env-file=.env packages/db/src/criar-acesso.ts \
+  --email alanvitoraraujo1a@outlook.com --nome "Alan Araújo" --empresa <slug>
+```
+
+Sem `--senha` ele gera uma frase forte e a imprime uma única vez. O script é
+idempotente e serve para qualquer pessoa e papel.
+
+**Ainda pendente e relacionado:** não existe fluxo de "esqueci a senha" (ver
+Menores). Enquanto não existir, trocar a senha do proprietário depende de rodar
+esse script.
 
 ---
 
