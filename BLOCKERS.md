@@ -117,6 +117,52 @@ ou preparo uma planilha para ele preencher.
 
 ---
 
+## B6 · Primeiro deploy em produção — falta decisão e pré-requisitos
+
+Pedido em 2026-09-03: "subir tudo para a produção". O trabalho está commitado
+(`6587a87`), build e testes passam, mas **o deploy não foi disparado** porque o
+alvo é ambíguo e o ambiente não está pronto. Nada disso é código a escrever:
+
+1. **Dois alvos possíveis, e não dá para adivinhar.** Existe projeto na Vercel
+   (`otto-bot`, `prj_1VimSTaFbviYTxrEBNWDlXIXvd4U`) e ambiente `production` no
+   Railway. O último commit anterior era "Ajusta build web para Vercel", mas os
+   deploys reais do Railway saíram por CLI. Qual é a produção de verdade?
+2. **O `production` do Railway nunca rodou a aplicação.** Só existem lá
+   `Postgres-NM6T` e `Redis-Y70L`; `web` e `worker` só têm deploy em
+   `development`. Ou seja, seria o primeiro lançamento, não um redeploy.
+3. **O banco de produção nunca foi migrado.** Subir o `web` contra ele entrega
+   aplicação quebrada. Precisa rodar as migrations antes do primeiro deploy.
+4. **Não consigo conferir as variáveis de produção** (leitura de segredo
+   bloqueada, e está certo assim). Não sei se `DATABASE_URL`, segredo de sessão
+   e afins estão configurados no ambiente de produção.
+5. **Sem canal real, produção é uma casca.** B2 e B3 continuam abertos: sem app
+   da Meta e sem número de WhatsApp, o produto em produção não recebe uma
+   mensagem de cliente sequer.
+
+**Quando voltar:** diga o alvo (Vercel ou Railway `production`). Eu rodo as
+migrations, confiro as variáveis, faço o deploy e valido pelo `/api/saude`.
+
+---
+
+## B7 · Senha do acesso principal — a regra do próprio produto recusa
+
+Pedido: tornar `alanvitoraraujo1a@outlook.com` / `alan123` o acesso principal.
+
+**O e-mail eu configuro sem problema. A senha não posso usar:** `alan123` tem 7
+caracteres, e a regra de senha do próprio produto
+(`esquemaSenha`, em `packages/core/src/auth/senha.ts`) exige **no mínimo 10**.
+Gravar esse acesso significaria furar a validação do próprio sistema — em
+produção e justamente na conta de proprietário, que é a de maior poder.
+
+Some-se a isso que não existe fluxo de "esqueci a senha" (ver Menores): se essa
+senha vazar, não há autoatendimento para trocá-la.
+
+**Quando voltar:** me passe uma frase de 10+ caracteres, ou me autorize a gerar
+uma forte e te entregar. Aí eu crio o usuário como `proprietario` da empresa e
+confirmo o login.
+
+---
+
 ## Menores (não bloqueiam nada) — para o backlog do time
 
 - **`next lint`** está quebrado no repo inteiro (o Next 16 removeu o comando).
