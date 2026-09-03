@@ -24,5 +24,9 @@ node packages/db/src/bootstrap.ts
 echo "[arranque] aplicando migrações pendentes"
 node packages/db/src/migrate.ts
 
+# Primeira empresa do ambiente. Inerte quando PROVISIONAR_SLUG não existe, que
+# é o caso em todo deploy depois do primeiro.
+node packages/db/src/provisionar.ts
+
 echo "[arranque] iniciando worker"
 exec pnpm --filter @otto/worker start
