@@ -353,12 +353,26 @@ export async function responder(pedido: PedidoAgente): Promise<ResultadoAgente> 
  * O que medimos: força do que foi recuperado, se veio pelos dois caminhos de
  * busca, e se a resposta não é uma recusa disfarçada.
  */
-function calcularConfianca(
-  trechos: TrechoRecuperado[],
-  texto: string | null,
-  origem: OrigemFundamento,
-): number {
-  if (!texto?.trim()) return 0;
+/**
+ * Quanto a fonte, sozinha, sustenta a resposta — antes de olhar o texto.
+ *
+ * Separado do `calcularConfianca` porque as saídas antecipadas puravam a
+ * verificação de recusa: com `origem: 'unidades'` e nenhum trecho, a função
+ * devolvia 0,8 e ia embora, então um modelo que recusasse **mesmo tendo
+ * fundamento** passava como resposta confiante. A ordem certa é: pontuar a
+ * fonte, depois olhar o que saiu.
+ */
+function confiancaBase(trechos: TrechoRecuperado[], origem: OrigemFundamento): number {
+  // Fundamento vindo da equipe não passa pela recuperação de conhecimento: o
+  // que o autoriza é a mesma regra calibrada, aplicada à fala do operador. Os
+  // trechos recuperados são irrelevantes aqui — foram justamente julgados
+  // insuficientes —, então pontuar por eles derruba a resposta que a barreira
+  // aprovou. Foi o que aconteceu em produção: `origem: operador` saiu com
+  // `confianca: 0,3` e virou handoff.
+  //
+  // Abaixo de `unidades` de propósito: é a palavra de uma pessoa naquela
+  // conversa, não dado cadastrado da empresa.
+  if (origem === 'operador') return 0.75;
 
   const melhor = trechos[0];
 
@@ -372,10 +386,29 @@ function calcularConfianca(
   if (melhor.origem === 'ambos') confianca = Math.min(1, confianca + 0.2);
   if (origem === 'ambos') confianca = Math.min(1, confianca + 0.15);
   if (trechos.length >= 2) confianca = Math.min(1, confianca + 0.1);
+  return confianca;
+}
+
+function calcularConfianca(
+  trechos: TrechoRecuperado[],
+  texto: string | null,
+  origem: OrigemFundamento,
+): number {
+  if (!texto?.trim()) return 0;
+
+  let confianca = confiancaBase(trechos, origem);
 
   // Resposta que admite desconhecimento não deve passar como confiante — é
   // exatamente o caso em que um humano resolve melhor.
-  const recusa = /não (sei|tenho|consigo|posso)|não encontrei|chamar alguém|equipe/i;
+  //
+  // `equipe` sozinha saiu da lista: ela aparece tanto em "vou chamar alguém da
+  // equipe" quanto em "como a equipe te informou", e as duas são opostas. A
+  // segunda é a atribuição que o próprio produto exige quando a fonte é o
+  // operador — classificá-la como recusa capava em 0,3 justamente a resposta
+  // bem-comportada. O que caracteriza recusa é o **encaminhamento**, não a
+  // palavra.
+  const recusa =
+    /não (sei|tenho|consigo|posso)|não encontrei|(chamar|acionar|passar para|transferir para) (alguém|uma pessoa|a equipe)/i;
   if (recusa.test(texto)) confianca = Math.min(confianca, 0.3);
 
   return Number(confianca.toFixed(2));
@@ -488,3 +521,4 @@ async function registrarExecucao(d: DadosExecucao): Promise<void> {
     }
   });
 }
+export { calcularConfianca as calcularConfiancaParaTeste };
