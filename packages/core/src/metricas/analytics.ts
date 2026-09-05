@@ -1,6 +1,8 @@
 import { aiRuns, and, conversations, gte, lt, messages, sql, withTenant } from '@otto/db';
 import { inicioDoDiaLocal } from '@otto/shared';
 
+import { medianaPrimeiraResposta } from './tempo-resposta.ts';
+
 /**
  * Analytics.
  *
@@ -74,11 +76,7 @@ export async function resumo(
         comHandoff: sql<number>`count(*) filter (where ${conversations.handoffCount} > 0)::int`,
         handoffs: sql<number>`coalesce(sum(${conversations.handoffCount}), 0)::int`,
         clientes: sql<number>`count(distinct ${conversations.contactId})::int`,
-        medianaResposta: sql<number | null>`
-          percentile_cont(0.5) within group (
-            order by extract(epoch from ${conversations.firstResponseAt} - ${conversations.firstInboundAt})
-          ) filter (where ${conversations.firstResponseAt} is not null)
-        `,
+        medianaResposta: medianaPrimeiraResposta(j.inicio),
       })
       .from(conversations)
       .where(gte(conversations.createdAt, j.inicio));

@@ -1,7 +1,11 @@
 import { agents, agentVersions, aiRuns, and, eq, usageEvents, withTenant } from '@otto/db';
 import { childLogger, descreverErro, inicioDoDiaLocal, partesLocais, uuidv7 } from '@otto/shared';
 
-import { recuperar, temFundamento, type TrechoRecuperado } from '../knowledge/recuperacao.ts';
+import {
+  recuperar,
+  trechoQueSustenta,
+  type TrechoRecuperado,
+} from '../knowledge/recuperacao.ts';
 import { registrarUso } from '../knowledge/gestao.ts';
 import { blocoDeConhecimento, contextoDaEmpresa, historicoDaConversa } from './contexto.ts';
 import { avaliarFundamento, type OrigemFundamento } from './fundamento.ts';
@@ -84,17 +88,42 @@ export async function responder(pedido: PedidoAgente): Promise<ResultadoAgente> 
   // endereço e telefone são fundamento tão legítimo quanto a base de
   // conhecimento — e são as perguntas mais comuns de um comércio.
   const empresa = await contextoDaEmpresa(tenantId);
+  // Qual trecho sustenta, e por qual sinal. O motivo vai para o log junto com
+  // o `runId`, que é como se responde depois "por que a Bia respondeu isso?" —
+  // e, principalmente, "por que ela **não** respondeu?", que é a pergunta que
+  // aparece quando o cliente reclama.
+  const sustentacao = trechoQueSustenta(trechos);
+
   const origem = avaliarFundamento(
     textoDoCliente,
     trechos,
     empresa,
-    temFundamento(trechos),
+    sustentacao !== null,
   );
   const fundamentado = origem !== 'nenhum';
 
+  log.info(
+    {
+      runId,
+      origem,
+      motivo: sustentacao?.motivo ?? null,
+      item: sustentacao?.trecho.titulo ?? null,
+    },
+    'fundamento avaliado',
+  );
+
   // ── Sem fundamento: não chama o modelo ──────────────────────────────────────
   if (!fundamentado) {
-    log.info({ runId }, 'sem fundamento na base; encaminhando para humano');
+    log.info(
+      {
+        runId,
+        trechos: trechos.length,
+        melhorCobertura: trechos[0]?.cobertura ?? null,
+        melhorSimilaridade: trechos[0]?.similaridade ?? null,
+        melhorTrigrama: trechos[0]?.trigrama ?? null,
+      },
+      'sem fundamento na base; encaminhando para humano',
+    );
 
     await registrarExecucao({
       runId,

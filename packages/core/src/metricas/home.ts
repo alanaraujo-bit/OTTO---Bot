@@ -11,6 +11,8 @@ import {
 } from '@otto/db';
 import { inicioDoDiaLocal } from '@otto/shared';
 
+import { medianaPrimeiraResposta } from './tempo-resposta.ts';
+
 /**
  * Indicadores da Home.
  *
@@ -59,11 +61,7 @@ export async function indicadoresHome(
         conversas: sql<number>`count(*)::int`,
         comHandoff: sql<number>`count(*) filter (where ${conversations.handoffCount} > 0)::int`,
         encerradas: sql<number>`count(*) filter (where ${conversations.status} in ('resolvida','encerrada'))::int`,
-        medianaResposta: sql<number | null>`
-          percentile_cont(0.5) within group (
-            order by extract(epoch from ${conversations.firstResponseAt} - ${conversations.firstInboundAt})
-          ) filter (where ${conversations.firstResponseAt} is not null)
-        `,
+        medianaResposta: medianaPrimeiraResposta(inicioLocal),
       })
       .from(conversations)
       .where(gte(conversations.createdAt, inicioLocal));
