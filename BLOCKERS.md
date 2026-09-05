@@ -58,6 +58,17 @@ mesmo contrato dos canais reais: mesmo webhook, mesma deduplicação, mesma fila
 mesmo agente. A cadeia inteira é exercitável e testável sem a Meta. O adaptador
 do WhatsApp é escrito contra o contrato oficial da Cloud API.
 
+**RESOLVIDO em 2026-09-04 no que depende do webhook.** App `OTTO`
+(`1864610901368671`) inscrito na WABA de teste (`1389511429271679`), campo
+`messages` assinado, `META_APP_SECRET` e `META_WEBHOOK_VERIFY_TOKEN` no Railway.
+Conferido por `GET /<APP_ID>/subscriptions`, que devolve `active: true` e
+`fields: [messages]`. A Verificação de Negócios continua sendo o prazo longo,
+mas ela **não** bloqueia o número de teste.
+
+**Armadilha registrada:** inscrever o app na WABA e assinar o campo `messages`
+são passos diferentes. Faltando o segundo, o painel mostra URL verificada,
+permissões "Pronto para teste" e app inscrito — e nada chega. Ver `docs/META.md`.
+
 **Feito em 2026-09-04 — o webhook oficial está no ar.**
 `POST/GET https://otto.aionixdev.com/api/webhooks/meta/whatsapp`
 (`apps/web/src/app/api/webhooks/meta/whatsapp/route.ts`). Suporta o aperto de mão
@@ -79,17 +90,36 @@ em `webhook_events` e deduplicação por hash do corpo. O
 
 ---
 
-## B3 · Número de teste do WhatsApp — bloqueia a validação ponta a ponta real
+## B3 · Envio pelo WhatsApp — recebimento RESOLVIDO, envio pendente
 
-**O que falta:** `phone_number_id` e token de acesso do número de teste.
+**Recebimento: resolvido em 2026-09-04.** O número de teste está cadastrado como
+canal em produção e a cadeia inteira foi verificada **no ambiente real**:
 
-**Por que não dá para contornar:** só a Meta emite. Depende do B2, mas **não**
-depende da Verificação ser aprovada — o número de teste funciona em modo
-desenvolvimento desde o primeiro dia.
+- Canal `whatsapp` `1307560649104617` (`+1 555-204-7561`) na empresa `aionixdev`,
+  cadastrado pelo arranque do worker (`packages/db/src/cadastrar-canal.ts`).
+- Evento assinado com o App Secret real → `200` em 0,52 s → log do worker em
+  produção: `mensagem recebida` → `evento da Meta processado`.
 
-**Quando voltar:** painel do app → WhatsApp → API Setup. Traga o
-`phone_number_id` e o token temporário. Cadastro como canal do ambiente de teste
-e mando uma mensagem do seu celular para ver chegar na Inbox.
+**O que ainda falta: o envio.** `despachar()` em
+`packages/core/src/channels/envio.ts` continua lançando erro explícito para
+`whatsapp` — o adaptador da Cloud API não está escrito. A resposta do agente é
+gerada e fica gravada na conversa, mas **não chega ao cliente**, e a Inbox mostra
+o motivo.
+
+**Duas coisas travam o envio, e a segunda é sua:**
+
+1. **O adaptador** (`POST /<phone_number_id>/messages`) — trabalho nosso, não
+   depende de ninguém.
+2. **Um token que não expire.** O token temporário da tela API Setup dura 24 h;
+   um envio que para de funcionar no dia seguinte é pior que não ter envio.
+   Precisa de um **System User token** (Business Settings → Usuários do sistema →
+   gerar token com `whatsapp_business_messaging` e `whatsapp_business_management`).
+
+**E uma terceira, antes de guardar qualquer token:** a coluna
+`channels.credentials` promete cifragem AES-256-GCM com `ENCRYPTION_KEY`, e essa
+cifragem **ainda não existe no código**. Escrever o adaptador sem ela significaria
+gravar segredo em texto claro numa coluna que a Inbox lê. A ordem certa é:
+cifragem → token → adaptador.
 
 ---
 
