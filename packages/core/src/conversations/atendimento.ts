@@ -144,13 +144,15 @@ export async function atenderAutomaticamente(
           ? 'confianca_baixa'
           : 'erro_no_agente';
 
-    // Avisa o cliente **antes** de encaminhar, e só quando a conversa ainda não
-    // estava esperando alguém: repetir "vou chamar a equipe" a cada pergunta
-    // seria ruído, e ele já foi avisado uma vez.
-    const jaEsperava = conversa.status === 'aguardando_humano';
-    if (!jaEsperava) {
-      await avisarQueVaiChamarAlguem(tenantId, conversationId, mensagemId);
-    }
+    // Avisa **sempre**, e essa é a correção mais importante deste arquivo.
+    //
+    // Antes, a segunda pergunta sem resposta na mesma espera era respondida com
+    // silêncio, sob o argumento de que repetir seria ruído. Visto em produção
+    // com cliente real, o argumento cai: quem manda mensagem e não recebe nada
+    // não conclui "ele já me avisou" — conclui que foi ignorado, ou que
+    // quebrou. Silêncio é pior que repetição, e a repetição aqui é curta e
+    // muda de tom conforme a espera se estende.
+    await avisarQueVaiChamarAlguem(tenantId, conversationId, mensagemId);
 
     await encaminharParaHumano(tenantId, conversationId, motivo, resultado.runId);
 
@@ -243,8 +245,49 @@ export async function atenderAutomaticamente(
  * exatamente o que este produto existe para não fazer.
  */
 const AVISO_SEM_CONHECIMENTO =
-  'Essa informação eu não tenho confirmada aqui. ' +
-  'Vou chamar alguém da equipe para te ajudar.';
+  'Essa informação eu não tenho confirmada aqui, então já chamei alguém da ' +
+  'equipe para te ajudar. Enquanto eles não respondem, posso ajudar em mais ' +
+  'alguma coisa?';
+
+/**
+ * O aviso a partir da segunda pergunta sem resposta, na mesma espera.
+ *
+ * A versão anterior **calava** aqui, com o argumento de que repetir "vou chamar
+ * a equipe" seria ruído. Visto em produção com cliente real, o argumento não se
+ * sustenta: às 15:58 o cliente perguntou sobre cartão, recebeu o aviso,
+ * respondeu "Tudo bem, pode chamar" — e não recebeu **nada**. Do lado de lá,
+ * silêncio é indistinguível de ter sido ignorado, e é pior que repetição.
+ *
+ * Curto de propósito: reconhece, não repete o discurso inteiro, e não finge que
+ * é a primeira vez.
+ */
+const AVISO_AINDA_ESPERANDO =
+  'Essa eu também não tenho aqui, mas a equipe já foi avisada e responde em ' +
+  'instantes. Se tiver outra dúvida, pode mandar que eu tento ajudar.';
+
+/**
+ * Depois de muitas seguidas, para de oferecer ajuda que não está conseguindo dar.
+ *
+ * Continuar dizendo "posso ajudar em outra coisa?" à quinta pergunta seguida
+ * sem resposta soa desatento. Aqui a única coisa honesta é reconhecer a espera.
+ */
+const AVISO_SO_AGUARDAR = 'Ainda não consegui essa. Vamos aguardar a equipe, tá? 🙏';
+
+/** A partir daqui a Bia para de se oferecer e só reconhece a espera. */
+const TENTATIVAS_ATE_SO_AGUARDAR = 3;
+
+/**
+ * Qual aviso mandar, dado quantos já saíram nesta espera.
+ *
+ * Função pura e exportada para teste: a escalada é a regra que decide o que o
+ * cliente lê quando o produto não sabe responder, e é o texto que mais aparece
+ * numa base de conhecimento pequena. Errar aqui é errar na frente de todo mundo.
+ */
+export function avisoParaEspera(jaAvisados: number): string {
+  if (jaAvisados <= 0) return AVISO_SEM_CONHECIMENTO;
+  if (jaAvisados < TENTATIVAS_ATE_SO_AGUARDAR) return AVISO_AINDA_ESPERANDO;
+  return AVISO_SO_AGUARDAR;
+}
 
 /**
  * Grava e enfileira o aviso de encaminhamento.
@@ -299,6 +342,24 @@ async function avisarQueVaiChamarAlguem(
   mensagemId: string,
 ): Promise<void> {
   const criada = await withTenant(tenantId, async (tx) => {
+    // Quantos avisos já saíram **nesta espera**. O episódio recomeça quando um
+    // humano fala: se o atendente respondeu e devolveu, o cliente merece a
+    // explicação inteira de novo, não o encurtamento de quem já foi avisado.
+    const { rows } = await tx.execute<{ n: number }>(sql`
+      select count(*)::int as n
+        from ${messages} m
+       where m.conversation_id = ${conversationId}
+         and m.idempotency_key like 'aviso-%'
+         and m.created_at > coalesce(
+               (select max(h.created_at) from ${messages} h
+                 where h.conversation_id = ${conversationId}
+                   and h.author = 'operador'),
+               '-infinity'::timestamptz)
+    `);
+    const jaAvisados = rows[0]?.n ?? 0;
+
+    const texto = avisoParaEspera(jaAvisados);
+
     try {
       const [linha] = await tx
         .insert(messages)
@@ -308,7 +369,7 @@ async function avisarQueVaiChamarAlguem(
           direction: 'saida',
           author: 'agente',
           contentType: 'texto',
-          body: AVISO_SEM_CONHECIMENTO,
+          body: texto,
           status: 'pendente',
           idempotencyKey: `aviso-${mensagemId}`,
         })
@@ -334,7 +395,15 @@ export async function encaminharParaHumano(
       .update(conversations)
       .set({
         status: 'aguardando_humano',
-        handoffCount: sql`${conversations.handoffCount} + 1`,
+        // Conta a **transição**, não cada pergunta sem resposta. Uma conversa
+        // que já estava esperando e recebe mais três perguntas que a base não
+        // cobre não passou por três encaminhamentos: passou por um. Antes desta
+        // condição, "Passaram para humano" em produção marcava 8 num punhado de
+        // conversas — a métrica media a frustração do cliente, não o volume de
+        // trabalho da equipe, que é o que ela existe para medir.
+        handoffCount: sql`case when ${conversations.status} = 'aguardando_humano'
+                          then ${conversations.handoffCount}
+                          else ${conversations.handoffCount} + 1 end`,
         // **Não** pausa a IA por tempo, e isso foi corrigido depois de um teste
         // real: uma pausa de 30 minutos aqui transformava um handoff em mudez
         // prolongada. O cliente perguntava outra coisa — que a base respondia —
