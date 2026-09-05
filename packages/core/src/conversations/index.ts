@@ -45,4 +45,5 @@ export { ehViolacaoDeUnicidade } from './conflito.ts';
 export {
   marcarContatoComoEnsaio,
   marcarConversaComoEnsaio,
+  type ReclassificacaoDoHistorico,
 } from './ensaio.ts';

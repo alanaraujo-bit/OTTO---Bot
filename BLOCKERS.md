@@ -266,6 +266,28 @@ esse script.
 
 ---
 
+## B8 · Deploy não dispara sozinho — pendência de infraestrutura
+
+**O que acontece:** empurrar para `main` **não** gera deploy. Verificado em
+2026-09-05: `main` foi de `526ac5b` para `44792bf` e o último deploy de
+produção continuou sendo `fe9abe0d`, das 04:21 UTC. Vale para `web` e `worker`.
+
+**Por que importa:** hoje o deploy depende de alguém lembrar de disparar à mão,
+e o sintoma de esquecer é silencioso — o código está no `main`, os testes
+passaram, e produção segue rodando outra coisa. Foi exatamente essa a confusão
+que custou meia sessão hoje: comparar comportamento de produção com código que
+nunca tinha sido implantado.
+
+**Não bloqueia entrega:** o deploy manual pelo Railway funciona.
+
+**Quando voltar:** conferir no dashboard, em cada serviço, se há repositório e
+**branch** conectados (Settings → Source) e se o webhook do GitHub está ativo. O
+`get_service_config` mostra `Source repo` no `worker` mas **nenhuma fonte** no
+`web`, o que sugere que o `web` perdeu a conexão no Sync do B6 — o mesmo Sync
+que sobrescreveu as variáveis.
+
+---
+
 ## Menores (não bloqueiam nada) — para o backlog do time
 
 - **`next lint`** está quebrado no repo inteiro (o Next 16 removeu o comando).
@@ -276,3 +298,18 @@ esse script.
 - **Edição inline** de Conhecimento e da ficha de Cliente (renomear/anotar): as
   server actions já existem no core; falta a UI. O botão "Novo item" foi retirado
   do Conhecimento até lá.
+- **O mesmo telefone vira dois contatos.** Em produção há `Alan Araújo` com
+  `559491205078` (12 dígitos) e `Alan` com `5594991205078` (13). É a mesma
+  pessoa, com normalizações diferentes do número — provavelmente da troca de
+  canal. O efeito em métrica é direto: "clientes atendidos" conta dois onde há
+  um. Precisa de normalização E.164 na identidade do contato, e de uma fusão
+  para os cadastros já duplicados.
+- **`usage_events` não registra fornecedor nem modelo** (só `kind`, `quantity`,
+  `unit`, `cost_micro_usd`, `ref_type`, `ref_id`, `local_date`, `occurred_at`).
+  Provar que os embeddings de produção vieram do modelo real exigiu inspecionar
+  a estrutura dos vetores em vez de ler a auditoria. Duas colunas resolveriam.
+- **Não há como distinguir embedding real de simulado sem inspecionar vetor.**
+  O banco de `development` rodou meses com vetores do `ProvedorSimulado` — que
+  são aleatórios — enquanto o `BLOCKERS.md` registrava "9/9 com embedding". Ter
+  vetor não é ter vetor útil. Valeria gravar o modelo em `knowledge_chunks` e
+  recusar recuperação semântica quando ele não for o esperado.
