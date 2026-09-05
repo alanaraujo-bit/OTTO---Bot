@@ -84,9 +84,24 @@ describe('recusa o que não pode aceitar', () => {
     expect(() => cifrar('')).toThrow();
   });
 
-  it('exige chave de 32 bytes', () => {
-    process.env.ENCRYPTION_KEY = Buffer.alloc(16, 1).toString('base64');
-    expect(() => cifrar('x')).toThrow(/32 bytes/);
+  it('recusa segredo curto demais', () => {
+    process.env.ENCRYPTION_KEY = 'curta-demais';
+    expect(() => cifrar('x')).toThrow(/pelo menos 32 caracteres/);
+  });
+
+  it('aceita o segredo do Railway, que não decodifica para 32 bytes', () => {
+    // Regressão da falha que derrubou o worker de produção: `${{secret(64)}}`
+    // gera 64 caracteres que decodificam para 36 bytes, e a versão anterior
+    // recusava no arranque. Um segredo bom não pode ser rejeitado por causa da
+    // codificação.
+    process.env.ENCRYPTION_KEY = 'k'.repeat(64);
+    const cifrado = cifrar('TOKEN');
+    expect(decifrar(cifrado)).toBe('TOKEN');
+  });
+
+  it('aceita chave em base64 de 32 bytes', () => {
+    process.env.ENCRYPTION_KEY = Buffer.alloc(32, 3).toString('base64');
+    expect(decifrar(cifrar('TOKEN'))).toBe('TOKEN');
   });
 
   it('exige que a chave exista', () => {

@@ -1,4 +1,10 @@
-import { createCipheriv, createDecipheriv, randomBytes, timingSafeEqual } from 'node:crypto';
+import {
+  createCipheriv,
+  createDecipheriv,
+  hkdfSync,
+  randomBytes,
+  timingSafeEqual,
+} from 'node:crypto';
 
 /**
  * Cifragem de segredo em repouso — AES-256-GCM.
@@ -29,16 +35,30 @@ const BYTES_TAG = 16;
 const BYTES_CHAVE = 32; // AES-256.
 
 /**
- * Lê a chave do ambiente.
+ * Deriva a chave de 32 bytes a partir do segredo do ambiente.
  *
- * Aceita base64 e base64url, e exige 32 bytes exatos. Uma chave curta não é
- * "menos segura": ela quebra o AES-256, então falhar aqui é melhor que cifrar
- * com material insuficiente.
+ * **Deriva em vez de exigir formato**, e isso foi aprendido quebrando a
+ * produção: a primeira versão exigia exatamente 32 bytes em base64, e o
+ * `ENCRYPTION_KEY` do Railway — gerado por `${{secret(64)}}` — decodifica para
+ * 36. O worker entrou em ciclo de reinício no arranque e o ambiente parou de
+ * receber mensagem. Um segredo perfeitamente bom foi recusado por causa da
+ * codificação, que é a forma errada de ser rigoroso.
  *
- * Não guarda a chave em cache entre chamadas de propósito — o custo é
- * irrelevante perto de uma chamada de rede, e ler sempre significa que trocar a
- * variável e reiniciar basta, sem estado escondido em módulo.
+ * HKDF-SHA256 aceita qualquer material com entropia suficiente e entrega
+ * sempre os 32 bytes que o AES-256 precisa. O `salt` e o `info` são fixos e
+ * públicos — o segredo é o `ENCRYPTION_KEY`, não eles; servem para separar esta
+ * derivação de qualquer outra que o projeto venha a ter sobre a mesma chave.
+ *
+ * O que continua rígido é o que realmente importa: **comprimento mínimo**. Um
+ * segredo curto não vira forte por passar por HKDF.
+ *
+ * Trocar `salt`, `info` ou o algoritmo invalida tudo que já foi cifrado — por
+ * isso o prefixo `v1` no formato guardado.
  */
+const SALT = Buffer.from('otto/canal/credenciais/v1');
+const INFO = Buffer.from('aes-256-gcm');
+const MINIMO_SEGREDO = 32;
+
 function obterChave(): Buffer {
   const bruta = process.env.ENCRYPTION_KEY;
   if (!bruta) {
@@ -47,15 +67,14 @@ function obterChave(): Buffer {
     );
   }
 
-  const chave = Buffer.from(bruta, 'base64');
-  if (chave.length !== BYTES_CHAVE) {
+  if (bruta.length < MINIMO_SEGREDO) {
     throw new Error(
-      `ENCRYPTION_KEY precisa ter ${BYTES_CHAVE} bytes em base64 (tem ${chave.length}). ` +
+      `ENCRYPTION_KEY precisa ter pelo menos ${MINIMO_SEGREDO} caracteres (tem ${bruta.length}). ` +
         'Gere com: openssl rand -base64 32',
     );
   }
 
-  return chave;
+  return Buffer.from(hkdfSync('sha256', Buffer.from(bruta, 'utf8'), SALT, INFO, BYTES_CHAVE));
 }
 
 /** `true` quando a chave está presente e utilizável. Não lança. */

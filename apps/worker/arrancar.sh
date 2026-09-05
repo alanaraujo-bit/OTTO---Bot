@@ -28,11 +28,22 @@ node packages/db/src/migrate.ts
 # é o caso em todo deploy depois do primeiro.
 node packages/db/src/provisionar.ts
 
+# Os dois passos abaixo são de conveniência, e por isso **não** derrubam o
+# arranque quando falham — ao contrário das migrações, que derrubam.
+#
+# A distinção foi aprendida quebrando a produção: um erro no cadastro do canal
+# (chave de cifragem em formato inesperado) matou o worker em ciclo de
+# reinício, e o ambiente parou de receber mensagem de cliente. Um canal sem
+# credencial degrada o envio, que já falha de forma visível na Inbox; um worker
+# fora do ar interrompe tudo. Trocar o segundo pelo primeiro é um mau negócio.
+#
+# `|| echo` mantém o erro visível no log sem propagar o código de saída.
+
 # Canal real do ambiente. Inerte quando CANAL_EXTERNAL_ID não existe.
-node packages/db/src/cadastrar-canal.ts
+node packages/db/src/cadastrar-canal.ts || echo "[arranque] AVISO: cadastro de canal falhou; worker sobe assim mesmo"
 
 # Base de conhecimento de validação. Inerte sem SEMEAR_CONHECIMENTO=1.
-node packages/db/src/semear-conhecimento.ts
+node packages/db/src/semear-conhecimento.ts || echo "[arranque] AVISO: semeadura de conhecimento falhou; worker sobe assim mesmo"
 
 echo "[arranque] iniciando worker"
 exec pnpm --filter @otto/worker start
