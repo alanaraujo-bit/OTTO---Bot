@@ -266,6 +266,56 @@ esse script.
 
 ---
 
+## B9 · A Bia contradiz o humano que acabou de responder
+
+**Encontrado no teste ao vivo de 2026-09-05**, conversa
+`01a0727a-23fc-7525-a39d-d9d6ec532f77`:
+
+| Hora | Quem | Mensagem |
+| --- | --- | --- |
+| 13:54 | cliente | Qual o preço do cuscuz? |
+| 13:54 | Bia | Essa informação eu não tenho confirmada aqui. Vou chamar alguém… |
+| 13:55 | **Alan (humano)** | **o cuscuz está 4,99.** |
+| 13:55 | cliente | Show, quanto tá o cuscuz mesmo? |
+| 13:55 | Bia | Essa informação eu não tenho confirmada aqui. Vou chamar alguém… |
+
+A Bia oferece chamar a pessoa que respondeu quarenta segundos antes.
+
+**Por que acontece:** `atendimento.ts` suprime o aviso quando
+`conversa.status === 'aguardando_humano'`. Devolver o atendimento para a Bia
+limpa esse status, então a supressão não vale mais. Mecanicamente correto,
+errado para quem está do outro lado.
+
+**A causa de fundo:** a guarda pergunta *"a conversa está esperando humano?"*
+quando o que ela quer saber é *"já dissemos a esta pessoa que não sabemos
+disto?"*. São coisas diferentes, e o `status` só coincide com a segunda
+enquanto ninguém devolve a conversa.
+
+**Direção provável:** amarrar o aviso ao assunto e não ao status — não repetir
+para uma pergunta cujo tema já foi encaminhado nesta conversa. O sinal já é
+gravado em `knowledge_signals` com a pergunta, então o dado existe.
+
+---
+
+## B10 · O SSE tira o operador de onde ele está
+
+**Encontrado no mesmo teste.** Uma aba parada em `/e/aionixdev/conversas`
+navegou sozinha para `/e/aionixdev/conversas/01a0727a-…` quando chegou mensagem
+nova. Ninguém clicou.
+
+**Por que importa:** um operador lendo uma conversa pode ser jogado em outra
+porque um terceiro mandou mensagem. Numa Inbox movimentada isso é inviável.
+
+**Suspeita:** efeito do `router.refresh()` do componente `AoVivo` combinado com
+alguma seleção padrão da rota de conversas. É regressão introduzida junto com o
+SSE (`526ac5b`), não comportamento antigo.
+
+**Quando voltar:** reproduzir com duas abas, confirmar se a rota
+`/e/[empresa]/conversas` redireciona para a conversa mais recente, e se sim
+torná-lo inicial-apenas em vez de a cada releitura.
+
+---
+
 ## B8 · Deploy não dispara sozinho — pendência de infraestrutura
 
 **O que acontece:** empurrar para `main` **não** gera deploy. Verificado em
