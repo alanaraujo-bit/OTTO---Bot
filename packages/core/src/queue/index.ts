@@ -7,6 +7,7 @@ export {
   fecharFilas,
   fila,
   obterConexao,
+  pingRedis,
   type JobAprendizado,
   type JobEmbeddings,
   type JobEntrada,

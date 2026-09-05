@@ -126,6 +126,38 @@ export async function enfileirarAprendizado(dados: JobAprendizado): Promise<void
   await fila(FILAS.aprendizado).add('agregar', dados, { attempts: 2 });
 }
 
+/**
+ * Ping de saúde no Redis.
+ *
+ * Abre conexão própria e curta em vez de reaproveitar a das filas: aquela é
+ * configurada com `maxRetriesPerRequest: null` para o BullMQ, então um Redis
+ * fora do ar faria a verificação esperar em vez de responder — o oposto do que
+ * uma checagem de saúde precisa fazer.
+ */
+export async function pingRedis(): Promise<'ok' | 'indisponível' | 'não configurado'> {
+  const url = process.env.REDIS_URL;
+  if (!url) return 'não configurado';
+
+  const cliente = new IORedis(url, {
+    lazyConnect: true,
+    connectTimeout: 2000,
+    commandTimeout: 2000,
+    maxRetriesPerRequest: 1,
+    retryStrategy: () => null,
+    enableOfflineQueue: false,
+  });
+
+  try {
+    await cliente.connect();
+    await cliente.ping();
+    return 'ok';
+  } catch {
+    return 'indisponível';
+  } finally {
+    cliente.disconnect();
+  }
+}
+
 export async function fecharFilas(): Promise<void> {
   await Promise.all([...filas.values()].map((f) => f.close()));
   filas.clear();
