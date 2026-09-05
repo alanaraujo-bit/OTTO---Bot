@@ -58,3 +58,10 @@ export {
   unidadesRespondem,
   type OrigemFundamento,
 } from './fundamento.ts';
+
+export {
+  blocoDoOperador,
+  falaQueResponde,
+  falasDoOperador,
+  type FalaDoOperador,
+} from './operador.ts';

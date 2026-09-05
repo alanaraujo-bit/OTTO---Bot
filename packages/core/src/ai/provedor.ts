@@ -21,7 +21,7 @@ export interface MensagemChat {
    * confundia as duas — chegou a fazer uma frase da instrução ser enviada ao
    * cliente como se fosse resposta.
    */
-  marcador?: 'instrucao' | 'conhecimento';
+  marcador?: 'instrucao' | 'conhecimento' | 'operador';
   /** Preenchido quando `papel` é `ferramenta`. */
   nomeFerramenta?: string;
   chamadaId?: string;

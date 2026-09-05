@@ -8,7 +8,13 @@ import {
 } from '../knowledge/recuperacao.ts';
 import { registrarUso } from '../knowledge/gestao.ts';
 import { blocoDeConhecimento, contextoDaEmpresa, historicoDaConversa } from './contexto.ts';
-import { avaliarFundamento, type OrigemFundamento } from './fundamento.ts';
+import { avaliarFundamento, unidadesRespondem, type OrigemFundamento } from './fundamento.ts';
+import {
+  blocoDoOperador,
+  falaQueResponde,
+  falasDoOperador,
+  type FalaDoOperador,
+} from './operador.ts';
 import {
   compilarInstrucao,
   esquemaPersonalidade,
@@ -94,11 +100,38 @@ export async function responder(pedido: PedidoAgente): Promise<ResultadoAgente> 
   // aparece quando o cliente reclama.
   const sustentacao = trechoQueSustenta(trechos);
 
+  // Só se as fontes oficiais não tiverem nada: o que a equipe disse nesta
+  // conversa. É a autoridade mais fraca da hierarquia, e a mais cara de
+  // apurar (uma consulta e um embedding), então fica por último nos dois
+  // sentidos. Ver `operador.ts` para por que isto não é uma tabela nova.
+  const semFonteOficial =
+    sustentacao === null && !unidadesRespondem(textoDoCliente, empresa);
+
+  let fala: FalaDoOperador | null = null;
+  if (semFonteOficial) {
+    const falas = await falasDoOperador(tenantId, conversationId);
+    if (falas.length) {
+      let vetores = new Map<string, number[]>();
+      try {
+        const rotaEmb = rotaPara('embutir');
+        const r = await rotaEmb.provedor.embutir({
+          modelo: rotaEmb.modelo,
+          textos: falas.map((f) => f.texto),
+        });
+        vetores = new Map(falas.map((f, i) => [f.mensagemId, r.vetores[i]!]));
+      } catch (erro) {
+        log.warn({ erro }, 'embedding das falas da equipe indisponível; só texto');
+      }
+      fala = await falaQueResponde(tenantId, textoDoCliente, falas, vetores, embedding);
+    }
+  }
+
   const origem = avaliarFundamento(
     textoDoCliente,
     trechos,
     empresa,
     sustentacao !== null,
+    fala !== null,
   );
   const fundamentado = origem !== 'nenhum';
 
@@ -108,6 +141,7 @@ export async function responder(pedido: PedidoAgente): Promise<ResultadoAgente> 
       origem,
       motivo: sustentacao?.motivo ?? null,
       item: sustentacao?.trecho.titulo ?? null,
+      falaDaEquipe: fala?.mensagemId ?? null,
     },
     'fundamento avaliado',
   );
@@ -167,15 +201,32 @@ export async function responder(pedido: PedidoAgente): Promise<ResultadoAgente> 
       marcador: 'instrucao',
       conteudo: compilarInstrucao(personalidade, empresa),
     },
-    {
-      papel: 'sistema',
-      marcador: 'conhecimento',
-      conteudo: blocoDeConhecimento(
-        trechos,
-        empresa,
-        origem === 'unidades' || origem === 'ambos',
-      ),
-    },
+    // Quando quem sustenta é a equipe, o bloco de CONHECIMENTO fica de fora
+    // inteiro. Ele diria "nada foi encontrado, você não sabe a resposta" —
+    // contradizendo o bloco seguinte — e ainda ofereceria ao modelo trechos que
+    // a barreira já julgou insuficientes, que é convite a usá-los.
+    ...(origem === 'operador'
+      ? []
+      : [
+          {
+            papel: 'sistema' as const,
+            marcador: 'conhecimento' as const,
+            conteudo: blocoDeConhecimento(
+              trechos,
+              empresa,
+              origem === 'unidades' || origem === 'ambos',
+            ),
+          },
+        ]),
+    ...(fala && origem === 'operador'
+      ? [
+          {
+            papel: 'sistema' as const,
+            marcador: 'operador' as const,
+            conteudo: blocoDoOperador(fala, fuso),
+          },
+        ]
+      : []),
     ...historico,
   ];
 

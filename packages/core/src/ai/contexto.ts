@@ -49,12 +49,24 @@ export async function historicoDaConversa(
 
     const emOrdem = recentes.reverse();
 
-    const mensagens: MensagemChat[] = emOrdem.map((m) => ({
-      papel: m.autor === 'cliente' ? ('usuario' as const) : ('assistente' as const),
+    const mensagens: MensagemChat[] = emOrdem.map((m) => {
       // Mídia sem transcrição vira descrição: o modelo precisa saber que algo
       // chegou, mesmo sem conseguir ver.
-      conteudo: m.corpo ?? descreverSemTexto(m.tipo),
-    }));
+      const texto = m.corpo ?? descreverSemTexto(m.tipo);
+
+      // `operador` e `agente` iam os dois como `assistente`, e o modelo não
+      // tinha como saber se aquela frase foi dele ou de uma pessoa da equipe.
+      // A distinção importa: o que um humano afirmou tem autoridade que a Bia
+      // não tem, e não pode ser tratado como coisa que ela mesma inventou.
+      // O papel do protocolo de chat não carrega autor, então a marca vai no
+      // texto — é o único lugar que sobrevive até o modelo.
+      const conteudo = m.autor === 'operador' ? `[equipe] ${texto}` : texto;
+
+      return {
+        papel: m.autor === 'cliente' ? ('usuario' as const) : ('assistente' as const),
+        conteudo,
+      };
+    });
 
     return { mensagens, resumoAnterior: null };
   });

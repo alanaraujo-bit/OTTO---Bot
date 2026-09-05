@@ -15,7 +15,19 @@ import type { TrechoRecuperado } from '../knowledge/recuperacao.ts';
  * recusando responder o que sabe.
  */
 
-export type OrigemFundamento = 'conhecimento' | 'unidades' | 'ambos' | 'nenhum';
+export type OrigemFundamento =
+  | 'conhecimento'
+  | 'unidades'
+  | 'ambos'
+  /**
+   * O que a equipe disse **nesta conversa**.
+   *
+   * A autoridade mais fraca das que autorizam resposta, e de propósito: vale
+   * para este cliente, agora, e não é política da empresa. Só entra quando as
+   * fontes oficiais não têm nada — ver `avaliarFundamento`.
+   */
+  | 'operador'
+  | 'nenhum';
 
 /**
  * Termos que indicam pergunta sobre dados estruturados da unidade.
@@ -64,11 +76,20 @@ export function avaliarFundamento(
   trechos: TrechoRecuperado[],
   empresa: ContextoEmpresa,
   daBase: boolean,
+  doOperador = false,
 ): OrigemFundamento {
   const dasUnidades = unidadesRespondem(pergunta, empresa);
 
+  // A hierarquia de autoridade, escrita como ordem de avaliação. Fonte oficial
+  // primeiro; a fala da equipe só é consultada quando o cadastro e a base não
+  // têm nada a dizer.
+  //
+  // A ordem importa num caso concreto: se o horário está cadastrado e um
+  // operador digitou outro por engano, quem vale é o cadastro. O contrário
+  // deixaria um erro de digitação sobrescrever o dado curado da empresa.
   if (daBase && dasUnidades) return 'ambos';
   if (daBase) return 'conhecimento';
   if (dasUnidades) return 'unidades';
+  if (doOperador) return 'operador';
   return 'nenhum';
 }
