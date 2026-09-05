@@ -354,6 +354,11 @@ que sobrescreveu as variáveis.
   canal. O efeito em métrica é direto: "clientes atendidos" conta dois onde há
   um. Precisa de normalização E.164 na identidade do contato, e de uma fusão
   para os cadastros já duplicados.
+- **Rotação de segredos — decidida contra.** `SESSION_SECRET`, `ENCRYPTION_KEY`,
+  as senhas do Postgres, a `OPENAI_API_KEY` e o `META_APP_SECRET` passaram por
+  chat em texto claro. O Alan decidiu em 2026-09-05 **não rotacionar**, e as
+  variáveis seguem como estão. Fica registrado como decisão tomada, não como
+  pendência — para não reaparecer a cada sessão.
 - **`usage_events` não registra fornecedor nem modelo** (só `kind`, `quantity`,
   `unit`, `cost_micro_usd`, `ref_type`, `ref_id`, `local_date`, `occurred_at`).
   Provar que os embeddings de produção vieram do modelo real exigiu inspecionar
