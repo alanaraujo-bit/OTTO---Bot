@@ -116,16 +116,24 @@ não gerar às cegas.
 A Meta reenvia webhooks, entrega fora de ordem e duplica. O caminho de entrada precisa
 ser rápido e idempotente, ou o cliente recebe respostas duplicadas.
 
-1. `POST /api/webhooks/meta/:channel` — valida `X-Hub-Signature-256` em tempo constante.
+1. `POST /api/webhooks/meta/whatsapp` — valida `X-Hub-Signature-256` em tempo constante.
+   A rota é **estática**, não `/meta/:channel` como este documento supunha: a Cloud API
+   configura uma única URL de callback por app, e quem revela o canal é o
+   `phone_number_id` dentro do payload.
 2. Grava o payload bruto em `webhook_events` com chave única `(provider, external_id)`.
    Se já existe, responde `200` e para. **Essa é a idempotência.**
-3. Enfileira o `webhook_event.id`. Responde `200` em milissegundos.
-4. O worker resolve tenant → canal → contato → conversa → mensagem, em uma transação,
-   e publica no Redis para o SSE atualizar a Inbox ao vivo.
-5. Só então decide se a IA deve responder.
+3. Resolve tenant → canal → contato → conversa → mensagem, em uma transação, pelo
+   `phone_number_id`.
+4. Gera a resposta do agente no mesmo caminho, **sem passar pela fila**: quem está do
+   outro lado do WhatsApp está esperando, e uma fila aqui só acrescentaria latência.
+   Só o *envio* da resposta ao provedor é enfileirado (`FILAS.envio`).
+5. Responde `200` sempre que o corpo faz sentido sintático — inclusive quando o evento
+   não interessa (status de entrega, mídia não suportada, número desconhecido). O motivo
+   fica em `webhook_events.discard_reason`. Erro repetido faz a Meta **desativar** o
+   webhook, derrubando junto os canais que funcionam.
 
-Falhas do passo 4 em diante têm retry com backoff exponencial e terminam em uma fila
-morta visível no Backoffice, com ação de reprocessar. Nada some em silêncio.
+Falha no processamento marca o evento como `falhou`, com o payload bruto preservado para
+reprocessamento pelo Backoffice. Nada some em silêncio.
 
 ## 7. Camada de IA
 

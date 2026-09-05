@@ -24,6 +24,16 @@ const baseSchema = z.object({
 
 const webSchema = baseSchema.extend({
   PORT: z.coerce.number().int().positive().default(3000),
+  /**
+   * Segredos da Meta. Opcionais de propósito: o produto sobe e opera inteiro
+   * pelo canal `simulador` sem app aprovado, e exigi-los no arranque quebraria
+   * o desenvolvimento local por uma dependência que ainda está em análise.
+   *
+   * A ausência não é silenciosa: o webhook recusa a verificação (`503`) e
+   * recusa evento sem assinatura (`401`), dizendo qual variável falta.
+   */
+  META_WEBHOOK_VERIFY_TOKEN: z.string().min(16).optional(),
+  META_APP_SECRET: z.string().min(16).optional(),
 });
 
 const workerSchema = baseSchema.extend({

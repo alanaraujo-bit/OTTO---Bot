@@ -58,13 +58,24 @@ mesmo contrato dos canais reais: mesmo webhook, mesma deduplicação, mesma fila
 mesmo agente. A cadeia inteira é exercitável e testável sem a Meta. O adaptador
 do WhatsApp é escrito contra o contrato oficial da Cloud API.
 
+**Feito em 2026-09-04 — o webhook oficial está no ar.**
+`POST/GET https://otto.aionixdev.com/api/webhooks/meta/whatsapp`
+(`apps/web/src/app/api/webhooks/meta/whatsapp/route.ts`). Suporta o aperto de mão
+de verificação e a recepção de eventos, com assinatura conferida, registro bruto
+em `webhook_events` e deduplicação por hash do corpo. O
+`META_WEBHOOK_VERIFY_TOKEN` de produção foi gerado pelo próprio Railway
+(`${{secret(64)}}`) no serviço `web` — nunca passou por chat nem por shell. Ver
+`docs/META.md` para o passo a passo do painel da Meta.
+
 **Quando voltar:**
 1. business.facebook.com → criar portfólio de negócios → **submeter a
    Verificação de Negócios** (é esta etapa que demora)
 2. developers.facebook.com/apps → criar app → adicionar o produto WhatsApp
-3. Traga o `App Secret` (Configurações → Básico)
-4. Cole em `META_APP_SECRET`; o `META_WEBHOOK_VERIFY_TOKEN` eu gero
-5. Valido pelo handshake: a Meta manda um desafio e o webhook devolve
+3. WhatsApp → Configuration → Webhook: colar a URL acima e o Verify Token
+   copiado do Railway; assinar o campo `messages`
+4. Traga o `App Secret` (Configurações → Básico) — enquanto ele não estiver em
+   `META_APP_SECRET`, a rota aceita a verificação mas **recusa evento** com
+   `401`, porque não teria como provar que veio da Meta
 
 ---
 
