@@ -316,7 +316,35 @@ torná-lo inicial-apenas em vez de a cada releitura.
 
 ---
 
-## B8 · Deploy não dispara sozinho — pendência de infraestrutura
+## ~~B8 · Deploy não dispara sozinho~~ — RESOLVIDO (2026-09-05)
+
+**Causa:** o `web` estava **sem fonte conectada** no ambiente `production` —
+provável efeito do Sync do B6, o mesmo que sobrescreveu as variáveis. O
+`worker` tinha repositório mas também não reagia ao push.
+
+**Correção:** os dois reconectados a `alanaraujo-bit/OTTO---Bot@main`.
+
+**Provado, não presumido:** o commit `c4541b0` (só documentação) foi empurrado
+às 18:03:16 e os dois serviços implantaram sozinhos em ~90 s — `web`
+`94542a3a` e `worker` `757a32ca`, ambos `SUCCESS`, ambos carimbados com o hash
+do commit. `/api/saude` respondeu `{"ok":true,"banco":"ok","redis":"ok"}` e o
+worker registrou `worker no ar`.
+
+**Ganho colateral que importa tanto quanto o gatilho:** a lista de deploys
+passou a exibir o **hash do commit**. Os deploys manuais por tarball apareciam
+com `-`, e não havia como responder "o que está rodando em produção?" sem
+inferir por horário. Foi essa incerteza que fez comparar, por meia sessão,
+comportamento de produção com código que nunca tinha sido implantado.
+
+**O que continua frágil, e não foi resolvido:** não existe `railway.json` no
+repositório. Builder, caminho do Dockerfile, health check e política de
+reinício vivem **só no dashboard** — estado invisível, sem histórico e sem
+revisão em PR. É esse tipo de estado que o Sync apagou. Config versionada por
+serviço (`railway_config_file`) é a correção real; ver Menores.
+
+---
+
+## Histórico · B8 (diagnóstico original)
 
 **O que acontece:** empurrar para `main` **não** gera deploy. Verificado em
 2026-09-05: `main` foi de `526ac5b` para `44792bf` e o último deploy de
@@ -354,6 +382,12 @@ que sobrescreveu as variáveis.
   canal. O efeito em métrica é direto: "clientes atendidos" conta dois onde há
   um. Precisa de normalização E.164 na identidade do contato, e de uma fusão
   para os cadastros já duplicados.
+- **Configuração do Railway não é versionada.** Builder, caminho do Dockerfile,
+  health check e política de reinício vivem só no dashboard. O Sync do B6 apagou
+  a fonte do `web` sem ninguém notar, e nada impede que aconteça de novo. A
+  correção é um `railway.json` por serviço, apontado em `railway_config_file` —
+  mexe no build dos dois serviços de produção, então precisa de uma janela com
+  tempo de verificação.
 - **Rotação de segredos — decidida contra.** `SESSION_SECRET`, `ENCRYPTION_KEY`,
   as senhas do Postgres, a `OPENAI_API_KEY` e o `META_APP_SECRET` passaram por
   chat em texto claro. O Alan decidiu em 2026-09-05 **não rotacionar**, e as
