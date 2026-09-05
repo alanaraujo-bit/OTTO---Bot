@@ -20,6 +20,7 @@ import { and, channels, eq, getPlatformDb, tenants } from './index.ts';
  *   CANAL_HANDLE         como o número aparece para o cliente (+55 …)
  *   CANAL_TIPO           `whatsapp` (padrão) ou `instagram`
  *   CANAL_TOKEN          token de envio; cifrado antes de tocar o banco
+ *   CANAL_SUBSTITUI      `phone_number_id` antigo, a ser desconectado
  *
  * O `CANAL_TOKEN` **nunca** é gravado em texto claro: passa por `cifrar()`
  * (AES-256-GCM com `ENCRYPTION_KEY`) antes do `INSERT`. Sem ele o canal recebe
@@ -77,7 +78,11 @@ export async function cadastrarCanal(): Promise<void> {
         ...(credenciais ? { credentials: credenciais, connectedAt: new Date() } : {}),
       })
       .where(eq(channels.id, existente.id));
-    console.log(`[canal] ${tipo} ${externalId} confirmado (${existente.id})`);
+    console.log(
+      `[canal] ${tipo} ${externalId} confirmado (${existente.id})` +
+        (credenciais ? ' — credencial atualizada' : ' — sem credencial nova'),
+    );
+    await desconectarAnterior(tenantId, tipo, externalId);
     return;
   }
 
@@ -95,7 +100,53 @@ export async function cadastrarCanal(): Promise<void> {
     })
     .returning({ id: channels.id });
 
-  console.log(`[canal] ${tipo} ${externalId} cadastrado (${criado!.id})`);
+  console.log(
+    `[canal] ${tipo} ${externalId} cadastrado (${criado!.id})` +
+      (credenciais ? ' — com credencial de envio' : ' — sem credencial: só recebe'),
+  );
+  await desconectarAnterior(tenantId, tipo, externalId);
+}
+
+/**
+ * Desconecta o número que este substitui.
+ *
+ * Trocar de número é um canal **novo**, não uma edição do antigo: as conversas
+ * já tidas pertencem ao número em que aconteceram, e reescrever o
+ * `external_id` da linha existente faria o histórico mentir sobre por onde o
+ * cliente falou.
+ *
+ * O antigo fica em `desconectado`, o que já é entendido pelo envio — ele
+ * recusa a mensagem com "o canal está desconectado" em vez de tentar entregar
+ * por um número que não é mais nosso.
+ *
+ * Exige o id explícito. Desconectar sozinho "os outros canais da empresa"
+ * seria adivinhação, e uma empresa pode legitimamente ter dois números.
+ */
+async function desconectarAnterior(
+  tenantId: string,
+  tipo: 'whatsapp' | 'instagram',
+  novoExternalId: string,
+): Promise<void> {
+  const anterior = process.env.CANAL_SUBSTITUI?.trim();
+  if (!anterior || anterior === novoExternalId) return;
+
+  const atualizadas = await getPlatformDb()
+    .update(channels)
+    .set({ status: 'desconectado' })
+    .where(
+      and(
+        eq(channels.tenantId, tenantId),
+        eq(channels.kind, tipo),
+        eq(channels.externalId, anterior),
+      ),
+    )
+    .returning({ id: channels.id });
+
+  if (atualizadas.length) {
+    console.log(`[canal] ${anterior} marcado como desconectado (${atualizadas[0]!.id})`);
+  } else {
+    console.log(`[canal] nada a desconectar: ${anterior} não é um canal desta empresa`);
+  }
 }
 
 /**
