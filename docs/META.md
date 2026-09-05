@@ -181,7 +181,49 @@ O único caso em que respondemos erro é `503`, quando o banco ou o Redis não
 aceitou o evento — aí o reenvio da Meta é exatamente o que queremos, porque nada
 ficou guardado.
 
-## O que ainda falta
+## Ambientes compartilham Redis — armadilha de desenvolvimento
+
+Os ambientes `development` e `production` do Railway têm bancos e Redis
+próprios, mas o **worker de development e um worker local usam o mesmo Redis**.
+Os dois consomem a mesma fila, e quem pega o job decide qual código roda.
+
+Custou uma investigação longa: rodando o worker local com código novo, metade
+dos eventos era processada pelo worker de development com código antigo, e o
+resultado alternava sem padrão. O sintoma é um teste que passa e falha
+alternadamente sem nada ter mudado.
+
+Ao testar a fila localmente, garanta que o worker de development esteja com o
+mesmo commit — ou pare um dos dois.
+
+## Semear conhecimento e esperar o vetor
+
+`indexarItem` cria os trechos, mas o **embedding é gerado pela fila**, não na
+hora. Uma pergunta que chega antes disso não encontra fundamento e é encaminhada
+para humano — corretamente, mas por falta de vetor, não por falta de
+conhecimento. Aconteceu no primeiro ensaio em produção: "que horas abrem no
+domingo" foi encaminhada, e a mesma pergunta, um minuto depois, foi respondida.
+
+Depois de semear, espere `embeddings gerados` no log do worker antes de testar.
+
+## Conectar o número para enviar
+
+O envio está implementado (`packages/core/src/channels/whatsapp.ts`). Falta só a
+credencial. Para ligá-la, no serviço `worker` do ambiente:
+
+```
+CANAL_EXTERNAL_ID = <phone_number_id>
+CANAL_TOKEN       = <token de System User>
+```
+
+O `CANAL_TOKEN` é cifrado com `ENCRYPTION_KEY` antes de tocar o banco. **Apague a
+variável depois do deploy**: ela já cumpriu o papel, e variável de ambiente é o
+lugar mais fácil de vazar um segredo por engano.
+
+Precisa ser token de **System User**, não o temporário da tela API Setup: aquele
+dura 24 h, e um envio que para de funcionar no dia seguinte é pior que não ter
+envio.
+
+## Histórico — o que ainda faltava
 
 O caminho de **entrada** está pronto. O de **saída** não: `despachar()` em
 `packages/core/src/channels/envio.ts` ainda lança erro explícito para
