@@ -1,6 +1,8 @@
 import { and, channels, contactIdentities, conversations, eq, messages, withTenant } from '@otto/db';
 import { AppError, childLogger, descreverErro, naoEncontrado } from '@otto/shared';
 
+import { publicarEvento } from '../events/barramento.ts';
+
 /**
  * Envio de mensagens para os canais.
  *
@@ -101,6 +103,8 @@ export async function enviarMensagem(
         .where(eq(messages.id, messageId)),
     );
 
+    await publicarEvento(tenantId, { tipo: 'status_mensagem' });
+
     log.info({ canal: contexto.canalTipo }, 'mensagem enviada');
     return { ok: true, externalId: resultado.externalId };
   } catch (erro) {
@@ -127,6 +131,8 @@ async function marcarFalha(
       .set({ status: 'falhou', failedAt: new Date(), failureReason: motivo })
       .where(eq(messages.id, messageId)),
   );
+
+  await publicarEvento(tenantId, { tipo: 'status_mensagem' });
 }
 
 interface PedidoDespacho {

@@ -11,6 +11,7 @@ import {
 } from '@otto/db';
 import { childLogger, conflito } from '@otto/shared';
 
+import { publicarEvento } from '../events/barramento.ts';
 import { ehViolacaoDeUnicidade } from './conflito.ts';
 
 /**
@@ -158,6 +159,12 @@ export async function receberMensagem(entrada: MensagemRecebida): Promise<Result
       .where(eq(contacts.id, contactId));
 
     log.info({ conversationId, messageId: mensagemId, conversaNova }, 'mensagem recebida');
+
+    // Avisa a Inbox aberta. Fora da transação seria mais correto em teoria —
+    // publicar algo que ainda pode dar rollback é um risco —, mas o conteúdo do
+    // aviso é só "olhe de novo": um falso aviso custa uma releitura, e a
+    // releitura veria o estado certo de qualquer forma.
+    await publicarEvento(entrada.tenantId, { tipo: 'mensagem', conversationId });
 
     return { nova: true, conversationId, contactId, messageId: mensagemId, conversaNova };
   });

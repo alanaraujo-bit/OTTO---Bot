@@ -8,6 +8,7 @@ import {
 } from '@otto/db';
 import { childLogger, conflito, horas, uuidv7 } from '@otto/shared';
 
+import { publicarEvento } from '../events/barramento.ts';
 import { ehViolacaoDeUnicidade } from './conflito.ts';
 
 /**
@@ -65,6 +66,7 @@ export async function assumirConversa(
     });
   });
 
+  await publicarEvento(tenantId, { tipo: 'conversa', conversationId });
   log.info('conversa assumida');
 }
 
@@ -100,6 +102,7 @@ export async function devolverParaIA(
     });
   });
 
+  await publicarEvento(tenantId, { tipo: 'conversa', conversationId });
   childLogger({ tenantId, conversationId, userId }).info('conversa devolvida para a IA');
 }
 
@@ -120,7 +123,7 @@ export async function responderComoOperador(
   const corpo = texto.trim();
   if (!corpo) throw conflito('A mensagem está vazia.');
 
-  return withTenant(tenantId, async (tx) => {
+  const resultado = await withTenant(tenantId, async (tx) => {
     let mensagemId: string;
 
     try {
@@ -167,6 +170,9 @@ export async function responderComoOperador(
 
     return { mensagemId, duplicada: false };
   });
+
+  await publicarEvento(tenantId, { tipo: 'mensagem', conversationId });
+  return resultado;
 }
 
 export async function alterarModo(
@@ -200,6 +206,8 @@ export async function alterarModo(
       data: { de: antes?.modo ?? null, para: modo },
     });
   });
+
+  await publicarEvento(tenantId, { tipo: 'conversa', conversationId });
 }
 
 export async function resolverConversa(
@@ -221,6 +229,8 @@ export async function resolverConversa(
       data: {},
     });
   });
+
+  await publicarEvento(tenantId, { tipo: 'conversa', conversationId });
 }
 
 /** Chave de idempotência para um envio. Gerada pela interface, uma por mensagem. */

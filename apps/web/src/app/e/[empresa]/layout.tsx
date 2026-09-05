@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 
 import { ROTULO_PAPEL } from '@otto/core/auth';
 
+import { AoVivo } from '@/componentes/ao-vivo.tsx';
 import { Shell } from '@/componentes/shell.tsx';
 import { exigirAcesso } from '@/servidor/sessao.ts';
 
@@ -41,6 +42,8 @@ export default async function LayoutEmpresa({
         permissoes: [...acesso.permissoes],
       }}
     >
+      {/* Mantém tudo abaixo em dia sem F5: lista, contadores, estados e ticks. */}
+      <AoVivo empresaSlug={acesso.empresa.slug} />
       {children}
     </Shell>
   );

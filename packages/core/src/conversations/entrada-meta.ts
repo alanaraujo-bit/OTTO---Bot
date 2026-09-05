@@ -1,6 +1,7 @@
 import { and, channels, eq, getPlatformDb, inArray, messages, webhookEvents, withTenant } from '@otto/db';
 import { childLogger } from '@otto/shared';
 
+import { publicarEvento } from '../events/barramento.ts';
 import { atenderAutomaticamente } from './atendimento.ts';
 import { receberMensagem } from './ingestao.ts';
 
@@ -249,7 +250,11 @@ async function aplicarStatus(tenantId: string, status: StatusMeta): Promise<bool
       .returning({ id: messages.id }),
   );
 
-  return atualizadas.length > 0;
+  if (atualizadas.length > 0) {
+    await publicarEvento(tenantId, { tipo: 'status_mensagem' });
+    return true;
+  }
+  return false;
 }
 
 /**
