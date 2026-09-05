@@ -143,7 +143,13 @@ describe('cadeia completa de atendimento', () => {
 
     const resposta = gravadas.find((m) => m.direction === 'saida');
     expect(resposta).toBeDefined();
-    expect(resposta!.status).toBe('pendente');
+
+    // `pendente` é o estado no instante da gravação, mas um worker rodando
+    // contra o mesmo Redis pode consumir a fila antes desta linha executar —
+    // acontece com o worker do ambiente `development` (ver docs/META.md). O que
+    // o teste precisa garantir é que a resposta entrou no caminho de envio e
+    // não falhou; o instante exato do estado é corrida, não regra.
+    expect(['pendente', 'enviando', 'enviada']).toContain(resposta!.status);
     expect(resposta!.aiRunId).toBe(atendimento.runId);
     // Derivada do conhecimento, não inventada.
     expect(resposta!.body?.toLowerCase()).toContain('pix');
@@ -262,11 +268,21 @@ describe('cadeia completa de atendimento', () => {
     expect(handoff).toBeDefined();
     expect((handoff!.data as { motivo: string }).motivo).toBe('sem_conhecimento');
 
-    // Nenhuma resposta foi inventada para o cliente.
+    // Nenhuma resposta foi **inventada** para o cliente — mas ele também não
+    // fica no vácuo. A única saída é o aviso de encaminhamento, que admite não
+    // ter a informação em vez de aproximar uma resposta.
+    //
+    // Este trecho já afirmou `toHaveLength(0)`. O silêncio foi corrigido depois
+    // de um teste real: o cliente perguntava, não recebia nada, e concluía que
+    // ninguém tinha visto. O que segue proibido — e é o que o teste protege — é
+    // conteúdo factual que a base não sustenta.
     const saidas = await withTenant(tenantId, (tx) =>
       tx.select().from(messages).where(eq(messages.conversationId, recebida.conversationId)),
     );
-    expect(saidas.filter((m) => m.direction === 'saida')).toHaveLength(0);
+    const enviadas = saidas.filter((m) => m.direction === 'saida');
+    expect(enviadas).toHaveLength(1);
+    expect(enviadas[0]!.body).toMatch(/não tenho confirmada/i);
+    expect(enviadas[0]!.aiRunId).toBeNull();
 
     // E a execução ficou registrada como sem fundamento, sem custo.
     const execucoes = await withTenant(tenantId, (tx) =>

@@ -8,7 +8,7 @@ import {
   tenants,
   withTenant,
 } from '@otto/db';
-import { childLogger, minutos, uuidv7 } from '@otto/shared';
+import { childLogger, uuidv7 } from '@otto/shared';
 
 import { responder } from '../ai/agente.ts';
 import { ehViolacaoDeUnicidade } from './conflito.ts';
@@ -126,6 +126,14 @@ export async function atenderAutomaticamente(
           ? 'confianca_baixa'
           : 'erro_no_agente';
 
+    // Avisa o cliente **antes** de encaminhar, e só quando a conversa ainda não
+    // estava esperando alguém: repetir "vou chamar a equipe" a cada pergunta
+    // seria ruído, e ele já foi avisado uma vez.
+    const jaEsperava = conversa.status === 'aguardando_humano';
+    if (!jaEsperava) {
+      await avisarQueVaiChamarAlguem(tenantId, conversationId, mensagemId);
+    }
+
     await encaminharParaHumano(tenantId, conversationId, motivo, resultado.runId);
 
     // O sinal é o insumo do aprendizado. Só um fato observado — não muda nada
@@ -174,7 +182,13 @@ export async function atenderAutomaticamente(
       .update(conversations)
       .set({
         lastMessageAt: agora,
-        status: 'aguardando_cliente',
+        // A IA ter respondido **outra** pergunta não cancela o pedido de
+        // humano que já estava na fila. Rebaixar para `aguardando_cliente`
+        // aqui faria a conversa sumir da lista de quem espera atendimento, e
+        // ninguém voltaria a ela.
+        status: sql`case when ${conversations.status} = 'aguardando_humano'
+                    then ${conversations.status}
+                    else 'aguardando_cliente'::conversation_status end`,
         firstResponseAt: sql`coalesce(${conversations.firstResponseAt}, ${agora})`,
       })
       .where(eq(conversations.id, conversationId));
@@ -202,6 +216,56 @@ export async function atenderAutomaticamente(
  * chegou até ele, e o mesmo dado alimenta o aprendizado — "sem conhecimento" é
  * exatamente o sinal que gera sugestão de item novo na base.
  */
+/**
+ * A frase que o cliente recebe quando a base não cobre a pergunta.
+ *
+ * Silêncio não é uma resposta: quem pergunta e não recebe nada conclui que
+ * ninguém viu. A frase diz a verdade — não temos aquela informação confirmada —
+ * e diz o que vai acontecer. Ela **não** tenta responder por aproximação, que é
+ * exatamente o que este produto existe para não fazer.
+ */
+const AVISO_SEM_CONHECIMENTO =
+  'Essa informação eu não tenho confirmada aqui. ' +
+  'Vou chamar alguém da equipe para te ajudar.';
+
+/**
+ * Grava e enfileira o aviso de encaminhamento.
+ *
+ * Passa pelo mesmo caminho de qualquer resposta — mensagem gravada, envio pela
+ * fila —, então herda de graça o estado de entrega, a idempotência e o retry.
+ * A chave de idempotência é derivada da mensagem do cliente: reprocessar o
+ * mesmo evento não manda o aviso duas vezes.
+ */
+async function avisarQueVaiChamarAlguem(
+  tenantId: string,
+  conversationId: string,
+  mensagemId: string,
+): Promise<void> {
+  const criada = await withTenant(tenantId, async (tx) => {
+    try {
+      const [linha] = await tx
+        .insert(messages)
+        .values({
+          tenantId,
+          conversationId,
+          direction: 'saida',
+          author: 'agente',
+          contentType: 'texto',
+          body: AVISO_SEM_CONHECIMENTO,
+          status: 'pendente',
+          idempotencyKey: `aviso-${mensagemId}`,
+        })
+        .returning({ id: messages.id });
+      return linha!.id;
+    } catch (erro) {
+      if (!ehViolacaoDeUnicidade(erro, 'messages_idempotency_key')) throw erro;
+      return null;
+    }
+  });
+
+  if (criada) await enfileirarEnvio({ tenantId, messageId: criada });
+}
+
 export async function encaminharParaHumano(
   tenantId: string,
   conversationId: string,
@@ -214,9 +278,15 @@ export async function encaminharParaHumano(
       .set({
         status: 'aguardando_humano',
         handoffCount: sql`${conversations.handoffCount} + 1`,
-        // Pausa a IA por um tempo: sem isso, a próxima mensagem do cliente
-        // dispararia o agente de novo e atropelaria quem está assumindo.
-        aiPausedUntil: new Date(Date.now() + minutos(30)),
+        // **Não** pausa a IA por tempo, e isso foi corrigido depois de um teste
+        // real: uma pausa de 30 minutos aqui transformava um handoff em mudez
+        // prolongada. O cliente perguntava outra coisa — que a base respondia —
+        // e não recebia nada, porque o relógio ainda estava correndo.
+        //
+        // Quem impede a IA de falar por cima de um atendente é o próprio
+        // atendente: `assumirConversa` marca `assignedUserId` e põe o modo em
+        // `humano`. Enquanto ninguém assumiu, o modo ainda é IA, e o pedido do
+        // cliente merece a resposta que soubermos dar.
         priority: motivo === 'cliente_pediu' ? 1 : sql`${conversations.priority}`,
       })
       .where(eq(conversations.id, conversationId));
