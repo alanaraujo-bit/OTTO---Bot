@@ -102,6 +102,53 @@ No painel do app, em **WhatsApp → Configuration → Webhook fields**, assine
 `messages`. É esse campo que carrega tanto as mensagens recebidas quanto as
 confirmações de entrega.
 
+## Inscrever o app na WABA
+
+Verificar a URL **não** inscreve o app na conta. São dois passos: o handshake
+prova que a URL é nossa; a inscrição diz de qual WABA queremos os eventos. Sem o
+segundo, o endpoint fica no ar sem receber nada.
+
+```
+POST https://graph.facebook.com/v23.0/<WABA_ID>/subscribed_apps
+     ?access_token=<TOKEN_DE_SYSTEM_USER>
+```
+
+Conferir e desfazer:
+
+```
+GET    /v23.0/<WABA_ID>/subscribed_apps      # lista os apps inscritos
+DELETE /v23.0/<WABA_ID>/subscribed_apps      # remove a inscrição deste app
+```
+
+O token precisa das duas permissões: `whatsapp_business_messaging` (as
+mensagens) e `whatsapp_business_management` (o resto). O token temporário de 24 h
+da tela **API Setup** serve para testar; para produção, gere um token de **System
+User** em Business Settings, que não expira.
+
+## Tempo de resposta — por que a ingestão é assíncrona
+
+A Meta reenvia o que demora e desativa o webhook de quem falha de forma
+repetida. Desativar derruba **todos** os canais de **todos** os clientes, não só
+o que causou o problema.
+
+Por isso o `POST` grava o payload, enfileira e responde — não resolve canal nem
+chama a IA. Medido com build de produção, mensagem de texto em canal conhecido:
+
+| Versão | Tempo até o `200` |
+| --- | --- |
+| Processamento síncrono (IA no caminho da requisição) | **14,2 s** |
+| Grava + enfileira (atual) | **~0,35 s** |
+| Entrega repetida (deduplicação) | ~0,15 s |
+| Evento de status, sem mensagem | ~0,39 s |
+
+`200` aqui significa "recebi e guardei", não "processei". Quem interpreta é o
+worker, na fila `entrada`, com retry e backoff; o evento fica em
+`webhook_events` com `status`, `attempts` e `discard_reason` para o Backoffice.
+
+O único caso em que respondemos erro é `503`, quando o banco ou o Redis não
+aceitou o evento — aí o reenvio da Meta é exatamente o que queremos, porque nada
+ficou guardado.
+
 ## O que ainda falta
 
 O caminho de **entrada** está pronto. O de **saída** não: `despachar()` em

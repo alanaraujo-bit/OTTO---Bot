@@ -2,31 +2,32 @@ import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 
 import { NextResponse } from 'next/server';
 
-import { atenderAutomaticamente, receberMensagem } from '@otto/core/conversations';
-import { and, channels, eq, getPlatformDb, webhookEvents } from '@otto/db';
-import { childLogger, descreverErro, logger } from '@otto/shared';
+import { enfileirarEntrada } from '@otto/core/queue';
+import { getPlatformDb, webhookEvents } from '@otto/db';
+import { descreverErro, logger } from '@otto/shared';
 
 /**
  * Webhook oficial da Meta — WhatsApp Cloud API.
  *
  * A Meta configura **uma** URL de callback por app, sem identificador de canal
- * no caminho. Por isso a rota é estática, e não `/meta/:channel` como o desenho
- * original supunha: quem revela o canal é o `phone_number_id` dentro do
- * payload. O `docs/ARCHITECTURE.md` foi corrigido junto.
+ * no caminho. Por isso a rota é estática: quem revela o canal é o
+ * `phone_number_id` dentro do payload, resolvido no worker.
  *
  * Duas responsabilidades, com regras opostas:
  *
  * - **GET** é o aperto de mão de verificação. A Meta manda um desafio e espera
- *   o mesmo texto de volta, cru, sem aspas de JSON. Não toca no banco, não
- *   enfileira nada: é a única requisição que a Meta usa para decidir se a URL
- *   presta, e qualquer dependência lenta aqui vira uma falha de verificação
- *   difícil de diagnosticar.
+ *   o mesmo texto de volta, cru, sem aspas de JSON. Não toca no banco: é a
+ *   única requisição que a Meta usa para decidir se a URL presta, e qualquer
+ *   dependência lenta aqui vira uma falha de verificação difícil de diagnosticar.
  *
- * - **POST** é a entrega de evento. A Meta reenvia, duplica e entrega fora de
- *   ordem, e **desativa o webhook** de quem responde erro repetidamente. Então
- *   tudo que faz sentido sintático responde `200`, mesmo quando o evento não
- *   nos interessa — o motivo do descarte fica gravado em `webhook_events`, não
- *   no código de status.
+ * - **POST** é a entrega de evento, e o requisito é **velocidade**. Confere a
+ *   assinatura, grava o payload cru, enfileira e responde. Nada de resolver
+ *   canal, nada de chamar a IA: a Meta reenvia o que demora e desativa o
+ *   webhook de quem falha de forma repetida. Medido neste projeto: 14,2 s com a
+ *   IA no caminho síncrono contra 0,15 s gravando e enfileirando.
+ *
+ * O corolário é que responder `200` significa "recebi e guardei", não
+ * "processei" — que é exatamente o contrato que a Meta espera.
  */
 
 export const dynamic = 'force-dynamic';
@@ -44,8 +45,8 @@ const PROVEDOR = 'meta_whatsapp';
  * `"123"` — com aspas — e a Meta recusaria uma rota que parece correta.
  *
  * O desafio **não** é segredo: é um nonce público que a Meta gera para essa
- * requisição. Registrá-lo no log é justamente o que torna a verificação
- * auditável depois do clique em "Verificar e salvar".
+ * requisição. Registrá-lo no log é o que torna a verificação auditável depois
+ * do clique em "Verificar e salvar".
  */
 export function GET(requisicao: Request) {
   const parametros = new URL(requisicao.url).searchParams;
@@ -74,9 +75,11 @@ export function GET(requisicao: Request) {
 // ── Eventos (POST) ───────────────────────────────────────────────────────────
 
 export async function POST(requisicao: Request) {
+  const inicio = Date.now();
+
   // O corpo cru precisa ser lido **uma vez** e usado tanto para conferir a
-  // assinatura quanto para interpretar o evento. Reserializar o objeto muda
-  // espaços e ordem de chaves, e a assinatura deixa de bater.
+  // assinatura quanto para gravar. Reserializar o objeto muda espaços e ordem
+  // de chaves, e a assinatura deixa de bater.
   const corpoCru = await requisicao.text();
 
   const segredo = process.env.META_APP_SECRET;
@@ -93,9 +96,9 @@ export async function POST(requisicao: Request) {
     return NextResponse.json({ erro: 'assinatura inválida' }, { status: 401 });
   }
 
-  let payload: PayloadMeta;
+  let payload: unknown;
   try {
-    payload = JSON.parse(corpoCru) as PayloadMeta;
+    payload = JSON.parse(corpoCru);
   } catch {
     return NextResponse.json({ erro: 'corpo inválido' }, { status: 400 });
   }
@@ -105,187 +108,47 @@ export async function POST(requisicao: Request) {
   // barato. Conferir antes de inserir perderia a corrida entre duas entregas
   // simultâneas — a mesma escolha já feita em `receberMensagem`.
   const idEntrega = createHash('sha256').update(corpoCru).digest('hex');
-  const primeiraEntrega = await registrarEntrega(idEntrega, payload);
-
-  if (!primeiraEntrega) {
-    logger.debug({ idEntrega }, 'entrega repetida da Meta, ignorada');
-    return NextResponse.json({ ok: true, situacao: 'repetida' });
-  }
 
   try {
-    const resumo = await processar(payload);
-    await concluirEntrega(idEntrega, resumo.descarte);
-    return NextResponse.json({ ok: true, ...resumo.corpo });
+    const gravado = await registrarEntrega(idEntrega, payload);
+
+    if (!gravado) {
+      logger.debug({ idEntrega }, 'entrega repetida da Meta, ignorada');
+      return NextResponse.json({ ok: true, situacao: 'repetida' });
+    }
+
+    await enfileirarEntrada({ webhookEventId: gravado });
+
+    logger.info(
+      { idEntrega, eventoId: gravado, ms: Date.now() - inicio },
+      'evento da Meta recebido e enfileirado',
+    );
+    return NextResponse.json({ ok: true, situacao: 'recebida' });
   } catch (erro) {
-    logger.error({ erro: descreverErro(erro), idEntrega }, 'processamento do evento da Meta falhou');
-    await falharEntrega(idEntrega, erro);
-    // Ainda assim `200`: o evento está gravado e é reprocessável pelo
-    // Backoffice. Devolver erro faria a Meta reenviar e, na insistência,
-    // desativar o webhook inteiro — derrubando os canais que funcionam.
-    return NextResponse.json({ ok: true, situacao: 'retido' });
+    logger.error({ erro: descreverErro(erro), idEntrega }, 'falha ao receber evento da Meta');
+
+    // `503` de propósito, e só aqui: o evento **não** ficou guardado, então
+    // queremos que a Meta reenvie. Este é o único caso em que o reenvio é o
+    // comportamento desejado — banco ou Redis fora do ar é transitório.
+    return NextResponse.json({ erro: 'indisponível' }, { status: 503 });
   }
-}
-
-// ── Processamento ────────────────────────────────────────────────────────────
-
-interface MensagemMeta {
-  id: string;
-  from: string;
-  timestamp?: string;
-  type?: string;
-  text?: { body?: string };
-}
-
-interface PayloadMeta {
-  object?: string;
-  entry?: {
-    id?: string;
-    changes?: {
-      field?: string;
-      value?: {
-        metadata?: { phone_number_id?: string };
-        contacts?: { wa_id?: string; profile?: { name?: string } }[];
-        messages?: MensagemMeta[];
-        statuses?: unknown[];
-      };
-    }[];
-  }[];
-}
-
-interface Resumo {
-  corpo: Record<string, unknown>;
-  /** Preenchido quando o evento é válido mas não gera atendimento. */
-  descarte: string | null;
-}
-
-async function processar(payload: PayloadMeta): Promise<Resumo> {
-  if (payload.object !== 'whatsapp_business_account') {
-    return { corpo: { situacao: 'ignorada' }, descarte: 'objeto não é whatsapp_business_account' };
-  }
-
-  const mudancas = (payload.entry ?? []).flatMap((entrada) => entrada.changes ?? []);
-  const atendidas: string[] = [];
-  let descarte: string | null = null;
-
-  for (const mudanca of mudancas) {
-    const valor = mudanca.value;
-    if (!valor) continue;
-
-    // Confirmações de entrega e leitura chegam pela mesma porta. Ainda não
-    // atualizamos o estado da mensagem por elas — o adaptador de envio é B2/B3.
-    if (!valor.messages?.length) {
-      descarte ??= valor.statuses?.length ? 'evento de status, sem mensagem' : 'evento sem mensagem';
-      continue;
-    }
-
-    const phoneNumberId = valor.metadata?.phone_number_id;
-    const canal = phoneNumberId ? await encontrarCanal(phoneNumberId) : null;
-    if (!canal) {
-      // Um número que não é nosso não é erro do remetente: é um canal que
-      // ainda não foi cadastrado, e o Backoffice precisa enxergar isso.
-      descarte ??= `canal desconhecido (phone_number_id ${phoneNumberId ?? 'ausente'})`;
-      continue;
-    }
-
-    const log = childLogger({ tenantId: canal.tenantId, channelId: canal.id });
-
-    for (const mensagem of valor.messages) {
-      const texto = mensagem.type === 'text' ? mensagem.text?.body?.trim() : null;
-      if (!texto) {
-        // Áudio, imagem e documento entram na conversa quando houver
-        // transcrição e leitura de mídia; por ora o registro fica gravado.
-        descarte ??= `tipo não suportado: ${mensagem.type ?? 'desconhecido'}`;
-        continue;
-      }
-
-      const perfil = valor.contacts?.find((c) => c.wa_id === mensagem.from);
-
-      const recebida = await receberMensagem({
-        tenantId: canal.tenantId,
-        channelId: canal.id,
-        remetenteExterno: mensagem.from,
-        nomePerfil: perfil?.profile?.name ?? null,
-        telefone: /^\d{10,15}$/.test(mensagem.from) ? mensagem.from : null,
-        mensagemExterna: mensagem.id,
-        texto,
-        enviadaEm: mensagem.timestamp ? new Date(Number(mensagem.timestamp) * 1000) : undefined,
-      });
-
-      if (!recebida.nova) {
-        log.debug({ externalId: mensagem.id }, 'mensagem repetida da Meta');
-        continue;
-      }
-
-      await atenderAutomaticamente(
-        canal.tenantId,
-        recebida.conversationId,
-        recebida.messageId,
-        texto,
-      );
-      atendidas.push(recebida.conversationId);
-    }
-  }
-
-  if (atendidas.length === 0) {
-    return { corpo: { situacao: 'ignorada' }, descarte: descarte ?? 'nada a processar' };
-  }
-  return { corpo: { situacao: 'processada', conversas: atendidas.length }, descarte: null };
 }
 
 /**
- * Resolve o canal pelo `phone_number_id`.
+ * Devolve o id do evento gravado, ou `null` quando a entrega já existia.
  *
- * Acontece **antes** de haver contexto de empresa — é o número que revela de
- * quem é a mensagem —, então usa o caminho de plataforma, nunca o do console.
+ * O `null` do conflito não reenfileira nada de propósito: o job da primeira
+ * entrega já existe ou já rodou, e o `jobId` do BullMQ fecharia o caminho de
+ * qualquer forma.
  */
-async function encontrarCanal(
-  phoneNumberId: string,
-): Promise<{ id: string; tenantId: string } | null> {
-  const [canal] = await getPlatformDb()
-    .select({ id: channels.id, tenantId: channels.tenantId })
-    .from(channels)
-    .where(and(eq(channels.externalId, phoneNumberId), eq(channels.kind, 'whatsapp')))
-    .limit(1);
-
-  return canal ?? null;
-}
-
-// ── Registro bruto ───────────────────────────────────────────────────────────
-
-/** `false` quando a entrega já estava gravada. */
-async function registrarEntrega(idEntrega: string, payload: PayloadMeta): Promise<boolean> {
-  const inseridas = await getPlatformDb()
+async function registrarEntrega(idEntrega: string, payload: unknown): Promise<string | null> {
+  const [inserida] = await getPlatformDb()
     .insert(webhookEvents)
     .values({ provider: PROVEDOR, externalId: idEntrega, payload })
     .onConflictDoNothing({ target: [webhookEvents.provider, webhookEvents.externalId] })
     .returning({ id: webhookEvents.id });
 
-  return inseridas.length > 0;
-}
-
-async function concluirEntrega(idEntrega: string, descarte: string | null): Promise<void> {
-  await getPlatformDb()
-    .update(webhookEvents)
-    .set({
-      status: descarte ? 'descartado' : 'processado',
-      discardReason: descarte?.slice(0, 120) ?? null,
-      processedAt: new Date(),
-    })
-    .where(and(eq(webhookEvents.provider, PROVEDOR), eq(webhookEvents.externalId, idEntrega)));
-}
-
-async function falharEntrega(idEntrega: string, erro: unknown): Promise<void> {
-  try {
-    await getPlatformDb()
-      .update(webhookEvents)
-      .set({
-        status: 'falhou',
-        lastError: erro instanceof Error ? erro.message : 'erro desconhecido',
-      })
-      .where(and(eq(webhookEvents.provider, PROVEDOR), eq(webhookEvents.externalId, idEntrega)));
-  } catch (falha) {
-    logger.error({ erro: descreverErro(falha) }, 'não foi possível marcar a entrega como falha');
-  }
+  return inserida?.id ?? null;
 }
 
 // ── Comparações ──────────────────────────────────────────────────────────────

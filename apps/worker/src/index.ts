@@ -1,34 +1,116 @@
 import { Worker, type Job } from 'bullmq';
 
-import { closeDb, eq, getPlatformDb, isNull, knowledgeChunks, sql, tenants, withTenant } from '@otto/db';
-import { logger, parseWorkerEnv } from '@otto/shared';
+import {
+  closeDb,
+  eq,
+  getPlatformDb,
+  isNull,
+  knowledgeChunks,
+  sql,
+  tenants,
+  webhookEvents,
+  withTenant,
+} from '@otto/db';
+import { descreverErro, logger, parseWorkerEnv } from '@otto/shared';
 import { enviarMensagem } from '@otto/core/channels';
 import { agregarSinais } from '@otto/core/aprendizado';
 import { rotaPara } from '@otto/core/ai';
+import { interpretarEventoMeta, lerEventoWebhook } from '@otto/core/conversations';
 import {
   FILAS,
   fecharFilas,
   obterConexao,
   type JobAprendizado,
   type JobEmbeddings,
+  type JobEntrada,
   type JobEnvio,
 } from '@otto/core/queue';
 
 /**
  * Worker.
  *
- * Processa o que não pode fazer o cliente esperar: entregar a mensagem ao
- * provedor, gerar embeddings e agregar aprendizado.
+ * Processa o que não pode fazer o remetente do HTTP esperar: interpretar o
+ * evento que chegou da Meta, entregar a mensagem ao provedor, gerar embeddings
+ * e agregar aprendizado.
  *
- * O que **não** está aqui, de propósito: a geração da resposta do agente. Quem
- * está do outro lado do WhatsApp está esperando, e passar por uma fila só
- * acrescentaria latência a um caminho que precisa ser rápido.
+ * Sobre a resposta do agente: ela continua **fora** da fila no Simulador, onde
+ * quem espera do outro lado do HTTP é a pessoa usando o console. No caminho da
+ * Meta ela está aqui, porque lá quem espera é a Meta — que reenvia o que demora
+ * e desativa o webhook de quem falha de forma repetida — e o cliente recebe a
+ * resposta por um envio próprio, que a fila não atrasa.
  */
 
 const env = parseWorkerEnv();
 const log = logger.child({ processo: 'worker' });
 
 const workers: Worker[] = [];
+
+// ── Entrada (eventos da Meta) ─────────────────────────────────────────────────
+
+/**
+ * Interpreta um evento já gravado por `/api/webhooks/meta/whatsapp`.
+ *
+ * O payload vem do banco, não do job: o job carrega só o id. Assim um evento
+ * continua reprocessável pelo Backoffice mesmo depois de o job ter sumido do
+ * Redis, e o Redis não guarda cópia de conversa de cliente.
+ */
+workers.push(
+  new Worker<JobEntrada>(
+    FILAS.entrada,
+    async (job: Job<JobEntrada>) => {
+      const { webhookEventId } = job.data;
+
+      const evento = await lerEventoWebhook(webhookEventId);
+      if (!evento) {
+        log.warn({ webhookEventId }, 'evento de webhook não encontrado');
+        return;
+      }
+
+      await marcarEvento(webhookEventId, { status: 'processando', attempts: job.attemptsMade + 1 });
+
+      try {
+        const resultado = await interpretarEventoMeta(evento.payload);
+
+        await marcarEvento(webhookEventId, {
+          status: resultado.descarte ? 'descartado' : 'processado',
+          discardReason: resultado.descarte?.slice(0, 120) ?? null,
+          processedAt: new Date(),
+          tenantId: resultado.tenantId,
+          channelId: resultado.channelId,
+          lastError: null,
+        });
+
+        if (resultado.conversas.length) {
+          log.info(
+            { webhookEventId, conversas: resultado.conversas.length },
+            'evento da Meta processado',
+          );
+        }
+      } catch (erro) {
+        // Deixa `falhou` gravado e relança: o BullMQ decide se ainda há
+        // tentativa. Esgotadas, o job fica retido e o evento aparece no
+        // Backoffice com o motivo — nada some em silêncio.
+        await marcarEvento(webhookEventId, {
+          status: 'falhou',
+          lastError: erro instanceof Error ? erro.message.slice(0, 500) : 'erro desconhecido',
+        });
+        throw erro;
+      }
+    },
+    { connection: obterConexao(), concurrency: env.WORKER_CONCURRENCY },
+  ),
+);
+
+async function marcarEvento(
+  id: string,
+  campos: Partial<typeof webhookEvents.$inferInsert>,
+): Promise<void> {
+  try {
+    await getPlatformDb().update(webhookEvents).set(campos).where(eq(webhookEvents.id, id));
+  } catch (erro) {
+    log.error({ erro: descreverErro(erro), id }, 'não foi possível atualizar o evento');
+  }
+}
 
 // ── Envio ─────────────────────────────────────────────────────────────────────
 

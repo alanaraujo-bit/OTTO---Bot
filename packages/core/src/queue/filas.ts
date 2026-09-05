@@ -13,6 +13,8 @@ import { logger } from '@otto/shared';
  */
 
 export const FILAS = {
+  /** Interpreta um evento cru já gravado em `webhook_events`. */
+  entrada: 'entrada',
   /** Entrega a mensagem ao provedor do canal. */
   envio: 'envio',
   /** Gera vetores dos trechos publicados. */
@@ -22,6 +24,11 @@ export const FILAS = {
 } as const;
 
 export type NomeFila = (typeof FILAS)[keyof typeof FILAS];
+
+export interface JobEntrada {
+  /** Id da linha em `webhook_events`. O payload já está gravado. */
+  webhookEventId: string;
+}
 
 export interface JobEnvio {
   tenantId: string;
@@ -79,6 +86,20 @@ export function fila(nome: NomeFila): Queue {
     filas.set(nome, f);
   }
   return f;
+}
+
+/**
+ * Enfileira a interpretação de um evento de webhook.
+ *
+ * O `jobId` é o id do evento: se a mesma entrega for enfileirada duas vezes —
+ * por corrida entre dois processos `web`, por exemplo — o BullMQ trata como
+ * no-op. É a segunda linha de defesa; a primeira é o índice único
+ * `(provider, external_id)` da tabela.
+ */
+export async function enfileirarEntrada(dados: JobEntrada): Promise<void> {
+  await fila(FILAS.entrada).add('interpretar', dados, {
+    jobId: `entrada-${dados.webhookEventId}`,
+  });
 }
 
 /**

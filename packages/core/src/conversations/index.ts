@@ -33,4 +33,11 @@ export {
   responderComoOperador,
 } from './acoes.ts';
 
+export {
+  interpretarEventoMeta,
+  lerEventoWebhook,
+  type PayloadMeta,
+  type ResultadoEntrada,
+} from './entrada-meta.ts';
+
 export { ehViolacaoDeUnicidade } from './conflito.ts';
