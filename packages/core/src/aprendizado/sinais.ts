@@ -1,6 +1,7 @@
 import {
   and,
   desc,
+  inArray,
   eq,
   isNull,
   knowledgeSignals,
@@ -9,6 +10,9 @@ import {
   withTenant,
 } from '@otto/db';
 import { childLogger, dias } from '@otto/shared';
+
+import { rotaPara } from '../ai/roteador.ts';
+import { agruparPorIntencao, type PerguntaParaAgrupar } from './agrupamento.ts';
 
 /**
  * Sinais de aprendizado.
@@ -104,17 +108,15 @@ export async function agregarSinais(tenantId: string): Promise<SugestaoGerada[]>
   const desde = new Date(Date.now() - JANELA);
 
   return withTenant(tenantId, async (tx) => {
-    const grupos = await tx
+    // Um sinal por linha, e não `GROUP BY` — o agrupamento agora é por
+    // intenção, e isso o Postgres não sabe fazer. Ver `agrupamento.ts`.
+    const sinais = await tx
       .select({
-        pergunta: knowledgeSignals.queryText,
-        ocorrencias: sql<number>`count(*)::int`,
-        // Convertido para texto no SQL de propósito: o driver devolve string
-        // para agregado de timestamp, e o Drizzle chamaria `toISOString()` nela
-        // ao regravar — o que quebra em tempo de execução, não de compilação.
-        primeira: sql<string>`min(${knowledgeSignals.createdAt})::text`,
-        ultima: sql<string>`max(${knowledgeSignals.createdAt})::text`,
-        evidencia: sql<string[]>`array_agg(distinct ${knowledgeSignals.conversationId}::text)`,
-        exemplos: sql<string[]>`array_agg(distinct ${knowledgeSignals.data} ->> 'textoOriginal')`,
+        id: knowledgeSignals.id,
+        chave: knowledgeSignals.queryText,
+        original: sql<string | null>`${knowledgeSignals.data} ->> 'textoOriginal'`,
+        conversationId: knowledgeSignals.conversationId,
+        em: knowledgeSignals.createdAt,
       })
       .from(knowledgeSignals)
       .where(
@@ -125,18 +127,50 @@ export async function agregarSinais(tenantId: string): Promise<SugestaoGerada[]>
           sql`${knowledgeSignals.queryText} is not null`,
         ),
       )
-      .groupBy(knowledgeSignals.queryText)
-      .having(sql`count(*) >= ${OCORRENCIAS_MINIMAS}`)
-      .orderBy(desc(sql`count(*)`))
-      .limit(20);
+      .orderBy(knowledgeSignals.createdAt)
+      .limit(500);
+
+    // Abaixo do mínimo não há grupo possível — nem vale pagar o embedding.
+    if (sinais.length < OCORRENCIAS_MINIMAS) return [];
+
+    const perguntas: PerguntaParaAgrupar[] = sinais.map((s) => ({
+      id: s.id,
+      // O texto original é o que o cliente escreveu; a chave é o saco de
+      // palavras. Agrupar pelo original é o ponto da mudança — a chave só
+      // sobrevive como plano B sem embedding.
+      texto: s.original?.trim() || (s.chave ?? ''),
+      chave: s.chave ?? '',
+      em: s.em,
+      conversationId: s.conversationId,
+    }));
+
+    // Um lote só para todas as perguntas da janela. Sem isso, cada rodada faria
+    // uma chamada por sinal.
+    let embeddings: Map<string, number[]> | null = null;
+    try {
+      const rota = rotaPara('embutir');
+      const r = await rota.provedor.embutir({
+        modelo: rota.modelo,
+        textos: perguntas.map((p) => p.texto),
+      });
+      embeddings = new Map(perguntas.map((p, i) => [p.id, r.vetores[i]!]));
+    } catch (erro) {
+      log.warn({ erro }, 'embedding indisponível; agrupando por texto normalizado');
+    }
+
+    const grupos = agruparPorIntencao(perguntas, embeddings)
+      .filter((g) => g.membros.length >= OCORRENCIAS_MINIMAS)
+      .slice(0, 20);
 
     const geradas: SugestaoGerada[] = [];
 
     for (const grupo of grupos) {
-      if (!grupo.pergunta) continue;
-
-      const exemplo =
-        grupo.exemplos?.filter(Boolean)[0] ?? grupo.pergunta;
+      const exemplo = grupo.representante.texto;
+      const ocorrencias = grupo.membros.length;
+      const chaveDoGrupo = grupo.representante.chave;
+      const primeira = grupo.membros[0]!.em;
+      const ultima = grupo.membros[grupo.membros.length - 1]!.em;
+      const evidencia = [...new Set(grupo.membros.map((m) => m.conversationId).filter(Boolean))] as string[];
       const titulo = `Clientes perguntam: "${exemplo}"`;
 
       // A mesma demanda pode reaparecer depois de já ter sido recusada; nesse
@@ -147,16 +181,21 @@ export async function agregarSinais(tenantId: string): Promise<SugestaoGerada[]>
         .where(
           and(
             eq(knowledgeSuggestions.type, 'conhecimento_ausente'),
-            sql`${knowledgeSuggestions.rationale} like ${'%' + grupo.pergunta + '%'}`,
+            sql`${knowledgeSuggestions.rationale} like ${'%' + chaveDoGrupo + '%'}`,
           ),
         )
         .limit(1);
 
       const razao =
-        `${grupo.ocorrencias} ${grupo.ocorrencias === 1 ? 'cliente perguntou' : 'clientes perguntaram'} ` +
+        `${ocorrencias} ${ocorrencias === 1 ? 'cliente perguntou' : 'clientes perguntaram'} ` +
         `sobre isso nos últimos 14 dias, e a base de conhecimento não tinha resposta. ` +
         `A conversa foi encaminhada para atendimento humano em todos os casos.\n\n` +
-        `Pergunta normalizada: ${grupo.pergunta}`;
+        `Como perguntaram:\n` +
+        grupo.membros
+          .map((m) => `· ${m.texto}`)
+          .slice(0, 8)
+          .join('\n') +
+        `\n\nPergunta normalizada: ${chaveDoGrupo}`;
 
       if (existente) {
         // Recusa anterior é uma decisão; não reabrimos sozinhos.
@@ -165,18 +204,14 @@ export async function agregarSinais(tenantId: string): Promise<SugestaoGerada[]>
         await tx
           .update(knowledgeSuggestions)
           .set({
-            occurrences: grupo.ocorrencias,
-            lastSeenAt: new Date(grupo.ultima),
+            occurrences: ocorrencias,
+            lastSeenAt: ultima,
             rationale: razao,
-            priority: prioridade(grupo.ocorrencias),
+            priority: prioridade(ocorrencias),
           })
           .where(eq(knowledgeSuggestions.id, existente.id));
 
-        geradas.push({
-          id: existente.id,
-          titulo,
-          ocorrencias: grupo.ocorrencias,
-        });
+        geradas.push({ id: existente.id, titulo, ocorrencias });
       } else {
         const [criada] = await tx
           .insert(knowledgeSuggestions)
@@ -186,19 +221,15 @@ export async function agregarSinais(tenantId: string): Promise<SugestaoGerada[]>
             status: 'aberta',
             title: titulo.slice(0, 200),
             rationale: razao,
-            evidence: (grupo.evidencia ?? []).filter(Boolean).slice(0, 20),
-            occurrences: grupo.ocorrencias,
-            firstSeenAt: new Date(grupo.primeira),
-            lastSeenAt: new Date(grupo.ultima),
-            priority: prioridade(grupo.ocorrencias),
+            evidence: evidencia.slice(0, 20),
+            occurrences: ocorrencias,
+            firstSeenAt: primeira,
+            lastSeenAt: ultima,
+            priority: prioridade(ocorrencias),
           })
           .returning({ id: knowledgeSuggestions.id });
 
-        geradas.push({
-          id: criada!.id,
-          titulo,
-          ocorrencias: grupo.ocorrencias,
-        });
+        geradas.push({ id: criada!.id, titulo, ocorrencias });
       }
 
       // Marca os sinais como consumidos para não recontá-los na próxima rodada.
@@ -207,7 +238,10 @@ export async function agregarSinais(tenantId: string): Promise<SugestaoGerada[]>
         .set({ aggregatedAt: new Date() })
         .where(
           and(
-            eq(knowledgeSignals.queryText, grupo.pergunta),
+            inArray(
+              knowledgeSignals.id,
+              grupo.membros.map((m) => m.id),
+            ),
             isNull(knowledgeSignals.aggregatedAt),
           ),
         );
