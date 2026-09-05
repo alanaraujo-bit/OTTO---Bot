@@ -272,6 +272,16 @@ async function resolverConversa(
 
   if (aberta) return { conversationId: aberta.id, conversaNova: false };
 
+  // Um contato marcado como ensaio abre conversas de ensaio. É herança na
+  // criação, não uma consulta que as métricas fariam depois: assim o marcador
+  // fica congelado no momento em que a conversa nasceu, e despromover o contato
+  // a cliente de verdade amanhã não reescreve o passado dele.
+  const [contato] = await tx
+    .select({ isTest: contacts.isTest })
+    .from(contacts)
+    .where(eq(contacts.id, contactId))
+    .limit(1);
+
   const [nova] = await tx
     .insert(conversations)
     .values({
@@ -280,6 +290,8 @@ async function resolverConversa(
       channelId: entrada.channelId,
       status: 'aberta',
       mode: 'automatico',
+      isTest: contato?.isTest ?? false,
+      testMarkedAt: contato?.isTest ? new Date() : null,
     })
     .onConflictDoNothing()
     .returning({ id: conversations.id });

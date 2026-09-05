@@ -1,6 +1,9 @@
 export {
+  decidirTrecho,
   recuperar,
   temFundamento,
+  trechoQueSustenta,
+  type MotivoFundamento,
   type TrechoRecuperado,
   type OpcoesRecuperacao,
 } from './recuperacao.ts';

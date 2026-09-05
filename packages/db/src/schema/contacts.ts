@@ -39,6 +39,15 @@ export const contacts = pgTable(
     notes: text('notes'),
     /** Bloqueia respostas automáticas para esse contato. */
     isBlocked: boolean('is_blocked').notNull().default(false),
+    /**
+     * Contato usado para ensaio.
+     *
+     * Vale como **padrão herdado** pelas conversas criadas a partir dele, e não
+     * como verdade sobre cada uma: a mesma pessoa pode ensaiar hoje e ser
+     * cliente amanhã, que foi exatamente o caso do número do próprio dono em
+     * produção. Quem manda por conversa é `conversations.isTest`.
+     */
+    isTest: boolean('is_test').notNull().default(false),
     firstSeenAt: stampedAt('first_seen_at'),
     lastInteractionAt: timestamp('last_interaction_at', { withTimezone: true }),
     conversationCount: integer('conversation_count').notNull().default(0),

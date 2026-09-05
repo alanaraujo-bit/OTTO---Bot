@@ -11,6 +11,9 @@ import {
 } from '@otto/db';
 import { inicioDoDiaLocal } from '@otto/shared';
 
+import { conversaReal, deConversaReal } from './ensaio.ts';
+import { medianaPrimeiraResposta } from './tempo-resposta.ts';
+
 /**
  * Indicadores da Home.
  *
@@ -52,26 +55,23 @@ export async function indicadoresHome(
         aguardandoHumano: sql<number>`count(*) filter (where ${conversations.status} = 'aguardando_humano')::int`,
         emAndamento: sql<number>`count(*) filter (where ${conversations.status} in ('aberta','aguardando_cliente'))::int`,
       })
-      .from(conversations);
+      .from(conversations)
+      .where(conversaReal());
 
     const [dia] = await tx
       .select({
         conversas: sql<number>`count(*)::int`,
         comHandoff: sql<number>`count(*) filter (where ${conversations.handoffCount} > 0)::int`,
         encerradas: sql<number>`count(*) filter (where ${conversations.status} in ('resolvida','encerrada'))::int`,
-        medianaResposta: sql<number | null>`
-          percentile_cont(0.5) within group (
-            order by extract(epoch from ${conversations.firstResponseAt} - ${conversations.firstInboundAt})
-          ) filter (where ${conversations.firstResponseAt} is not null)
-        `,
+        medianaResposta: medianaPrimeiraResposta(inicioLocal),
       })
       .from(conversations)
-      .where(gte(conversations.createdAt, inicioLocal));
+      .where(and(gte(conversations.createdAt, inicioLocal), conversaReal()));
 
     const [msgs] = await tx
       .select({ total: sql<number>`count(*)::int` })
       .from(messages)
-      .where(gte(messages.createdAt, inicioLocal));
+      .where(and(gte(messages.createdAt, inicioLocal), deConversaReal(messages.conversationId)));
 
     const [ia] = await tx
       .select({
@@ -79,7 +79,7 @@ export async function indicadoresHome(
         semFundamento: sql<number>`count(*) filter (where ${aiRuns.outcome} = 'sem_fundamento')::int`,
       })
       .from(aiRuns)
-      .where(gte(aiRuns.createdAt, inicioLocal));
+      .where(and(gte(aiRuns.createdAt, inicioLocal), deConversaReal(aiRuns.conversationId)));
 
     const conversasHoje = dia?.conversas ?? 0;
     const encerradas = dia?.encerradas ?? 0;
