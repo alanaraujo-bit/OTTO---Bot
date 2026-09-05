@@ -102,7 +102,39 @@ No painel do app, em **WhatsApp → Configuration → Webhook fields**, assine
 `messages`. É esse campo que carrega tanto as mensagens recebidas quanto as
 confirmações de entrega.
 
-## Inscrever o app na WABA
+## Identificadores do ambiente de teste
+
+| O quê | Valor |
+| --- | --- |
+| App | `OTTO` — `1864610901368671` |
+| WABA de teste | `1389511429271679` (`Test WhatsApp Business Account`, review `APPROVED`) |
+| Número de teste | `+1 555-204-7561` — `phone_number_id` **`1307560649104617`** |
+
+O `phone_number_id` é o que vai em `channels.external_id`; é por ele que o
+worker descobre de qual empresa é a mensagem. O `display_phone_number` não serve
+para nada além de aparecer na tela.
+
+## Inscrever o app — são **três** coisas, não uma
+
+Este é o ponto onde é fácil achar que terminou e não ter terminado. As três são
+independentes, e faltando qualquer uma não chega evento nenhum:
+
+1. **Verificar a URL** (handshake) — prova que a URL é nossa.
+2. **Inscrever o app na WABA** — diz de qual conta queremos os eventos.
+   `POST /<WABA_ID>/subscribed_apps`.
+3. **Assinar o campo `messages`** — diz *que tipo* de evento queremos.
+
+O sintoma de faltar a terceira é silencioso e enganoso: o painel mostra a URL
+verificada, as permissões como "Pronto para teste", e o app inscrito na WABA —
+e mesmo assim nada chega. Para conferir:
+
+```
+GET /v23.0/<APP_ID>/subscriptions?access_token=<APP_ID>|<APP_SECRET>
+```
+
+Se a resposta traz `callback_url` e `active: true` mas **nenhum `fields`**, é
+exatamente esse o caso. O campo se assina em **App Dashboard → WhatsApp →
+Configuration → Webhook fields → `messages`**.
 
 Verificar a URL **não** inscreve o app na conta. São dois passos: o handshake
 prova que a URL é nossa; a inscrição diz de qual WABA queremos os eventos. Sem o
