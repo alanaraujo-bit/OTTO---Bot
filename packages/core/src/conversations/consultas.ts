@@ -22,7 +22,19 @@ import {
  * aplicação.
  */
 
-export type FiltroStatus = 'todas' | 'aguardando_humano' | 'abertas' | 'resolvidas';
+export type FiltroStatus =
+  | 'todas'
+  | 'aguardando_humano'
+  | 'abertas'
+  | 'resolvidas'
+  /**
+   * Só os ensaios.
+   *
+   * A Inbox é o lugar certo para vê-los: eles saíram das métricas, não do
+   * produto. Um ensaio continua sendo a melhor forma de diagnosticar o que
+   * aconteceu — foi um deles que provou o envio pelo WhatsApp de ponta a ponta.
+   */
+  | 'ensaio';
 
 export interface ItemInbox {
   id: string;
@@ -39,6 +51,8 @@ export interface ItemInbox {
   previa: string | null;
   /** Se a última mensagem foi do cliente — muda o que a lista destaca. */
   ultimaDoCliente: boolean;
+  /** Conversa de ensaio. A lista rotula, para ninguém confundir com cliente. */
+  ehEnsaio: boolean;
   atribuidaA: string | null;
 }
 
@@ -67,6 +81,8 @@ export async function listarConversas(
       );
     } else if (status === 'resolvidas') {
       condicoes.push(sql`${conversations.status} in ('resolvida','encerrada')`);
+    } else if (status === 'ensaio') {
+      condicoes.push(eq(conversations.isTest, true));
     }
 
     if (atribuidaA) condicoes.push(eq(conversations.assignedUserId, atribuidaA));
@@ -96,6 +112,7 @@ export async function listarConversas(
         naoLidas: conversations.unreadCount,
         ultimaMensagemEm: conversations.lastMessageAt,
         atribuidaA: users.name,
+        ehEnsaio: conversations.isTest,
         previa: sql<string | null>`(
           select m.body from messages m
           where m.conversation_id = ${conversations.id}
@@ -228,6 +245,8 @@ export interface ContagemInbox {
   aguardando_humano: number;
   resolvidas: number;
   todas: number;
+  /** Conversas de ensaio. Fora das metricas, dentro da Inbox. */
+  ensaio: number;
   /** Mensagens ainda não lidas pela equipe, somadas. */
   naoLidas: number;
 }
@@ -247,6 +266,7 @@ export async function contarConversas(tenantId: string): Promise<ContagemInbox> 
         aguardando_humano: sql<number>`count(*) filter (where ${conversations.status} = 'aguardando_humano')::int`,
         resolvidas: sql<number>`count(*) filter (where ${conversations.status} in ('resolvida','encerrada'))::int`,
         todas: sql<number>`count(*)::int`,
+        ensaio: sql<number>`count(*) filter (where ${conversations.isTest})::int`,
         naoLidas: sql<number>`coalesce(sum(${conversations.unreadCount}), 0)::int`,
       })
       .from(conversations);
@@ -256,6 +276,7 @@ export async function contarConversas(tenantId: string): Promise<ContagemInbox> 
       aguardando_humano: c?.aguardando_humano ?? 0,
       resolvidas: c?.resolvidas ?? 0,
       todas: c?.todas ?? 0,
+      ensaio: c?.ensaio ?? 0,
       naoLidas: c?.naoLidas ?? 0,
     };
   });

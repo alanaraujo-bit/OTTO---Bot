@@ -12,7 +12,13 @@ import { exigirAcesso } from '@/servidor/sessao.ts';
 
 export const metadata: Metadata = { title: 'Conversas' };
 
-const FILTROS_VALIDOS: FiltroStatus[] = ['todas', 'aguardando_humano', 'abertas', 'resolvidas'];
+const FILTROS_VALIDOS: FiltroStatus[] = [
+  'todas',
+  'aguardando_humano',
+  'abertas',
+  'resolvidas',
+  'ensaio',
+];
 
 /**
  * Inbox sem conversa aberta.

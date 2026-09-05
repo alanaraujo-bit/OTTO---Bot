@@ -59,6 +59,27 @@ export const conversations = pgTable(
     /** 0 = normal, 1 = alta, 2 = urgente. Ordena a fila da Inbox. */
     priority: smallint('priority').notNull().default(0),
 
+    /**
+     * Conversa de ensaio — nossa ou do próprio dono testando o produto.
+     *
+     * Excluída de **toda** métrica comercial por definição, e não por filtro
+     * que alguém precisa lembrar de aplicar. A conversa continua existindo
+     * inteira: é por ela que se diagnostica o que aconteceu, e foi um ensaio
+     * que provou o envio pelo WhatsApp funcionando de ponta a ponta.
+     *
+     * Antes disso, o único jeito de reconhecer um ensaio era o nome do contato
+     * conter "Ensaio" — frágil de um jeito que apodrece, e que quebra no
+     * primeiro cliente de verdade com esse nome.
+     */
+    isTest: boolean('is_test').notNull().default(false),
+    /** Quando foi marcada como ensaio. */
+    testMarkedAt: timestamp('test_marked_at', { withTimezone: true }),
+    /**
+     * Quem marcou. Nulo com `isTest` verdadeiro significa marcação automática
+     * (semente ou migração) — que também é informação, não ausência dela.
+     */
+    testMarkedBy: uuid('test_marked_by'),
+
     /** Resumo mantido pelo sistema, para o humano que assume não ter que ler tudo. */
     summary: text('summary'),
     summaryUpdatedAt: timestamp('summary_updated_at', { withTimezone: true }),

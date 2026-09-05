@@ -29,6 +29,10 @@ const FILTROS: { valor: FiltroStatus; rotulo: string; chave: keyof ContagemInbox
   { valor: 'aguardando_humano', rotulo: 'Esperando', chave: 'aguardando_humano' },
   { valor: 'resolvidas', rotulo: 'Resolvidas', chave: 'resolvidas' },
   { valor: 'todas', rotulo: 'Todas', chave: 'todas' },
+  // Ensaio fica por último e só aparece quando existe: numa conta de cliente
+  // real, uma aba permanentemente vazia chamada "Ensaio" só ocuparia espaço e
+  // levantaria dúvida sobre o que é aquilo.
+  { valor: 'ensaio', rotulo: 'Ensaio', chave: 'ensaio' },
 ];
 
 export function ListaConversas({
@@ -112,7 +116,9 @@ export function ListaConversas({
         </div>
 
         <div role="tablist" aria-label="Filtrar conversas" className="mt-2 flex gap-0.5">
-          {FILTROS.map((f) => {
+          {FILTROS.filter(
+            (f) => f.valor !== 'ensaio' || contagem.ensaio > 0 || filtroAtual === 'ensaio',
+          ).map((f) => {
             const ativo = filtroAtual === f.valor;
             const n = contagem[f.chave];
             // Contador só onde ele muda o que a pessoa faz: na aba ativa (quantas
@@ -245,7 +251,12 @@ export function ListaConversas({
                         {c.ultimaDoCliente ? '' : 'Você: '}
                         {c.previa ?? 'Sem mensagens'}
                       </p>
-                      {esperando ? (
+                      {/* O rótulo de ensaio vem antes de tudo: ele muda como se
+                          lê a linha inteira, e confundir ensaio com cliente é o
+                          erro que esta distinção existe para impedir. */}
+                      {c.ehEnsaio ? (
+                        <Etiqueta tom="neutro">Ensaio</Etiqueta>
+                      ) : esperando ? (
                         <Etiqueta tom="atencao" ponto>
                           Esperando
                         </Etiqueta>

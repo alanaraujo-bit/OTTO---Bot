@@ -41,3 +41,8 @@ export {
 } from './entrada-meta.ts';
 
 export { ehViolacaoDeUnicidade } from './conflito.ts';
+
+export {
+  marcarContatoComoEnsaio,
+  marcarConversaComoEnsaio,
+} from './ensaio.ts';

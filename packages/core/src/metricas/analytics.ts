@@ -1,6 +1,7 @@
 import { aiRuns, and, conversations, gte, lt, messages, sql, withTenant } from '@otto/db';
 import { inicioDoDiaLocal } from '@otto/shared';
 
+import { conversaReal, deConversaReal } from './ensaio.ts';
 import { medianaPrimeiraResposta } from './tempo-resposta.ts';
 
 /**
@@ -79,7 +80,7 @@ export async function resumo(
         medianaResposta: medianaPrimeiraResposta(j.inicio),
       })
       .from(conversations)
-      .where(gte(conversations.createdAt, j.inicio));
+      .where(and(gte(conversations.createdAt, j.inicio), conversaReal()));
 
     const [anterior] = await tx
       .select({
@@ -92,6 +93,7 @@ export async function resumo(
         and(
           gte(conversations.createdAt, j.inicioAnterior),
           lt(conversations.createdAt, j.inicio),
+          conversaReal(),
         ),
       );
 
@@ -101,7 +103,7 @@ export async function resumo(
         enviadas: sql<number>`count(*) filter (where ${messages.direction} = 'saida')::int`,
       })
       .from(messages)
-      .where(gte(messages.createdAt, j.inicio));
+      .where(and(gte(messages.createdAt, j.inicio), deConversaReal(messages.conversationId)));
 
     const [ia] = await tx
       .select({
@@ -109,12 +111,18 @@ export async function resumo(
         semFundamento: sql<number>`count(*) filter (where ${aiRuns.outcome} = 'sem_fundamento')::int`,
       })
       .from(aiRuns)
-      .where(gte(aiRuns.createdAt, j.inicio));
+      .where(and(gte(aiRuns.createdAt, j.inicio), deConversaReal(aiRuns.conversationId)));
 
     const [iaAnterior] = await tx
       .select({ custo: sql<number>`coalesce(sum(${aiRuns.costMicroUsd}), 0)::bigint` })
       .from(aiRuns)
-      .where(and(gte(aiRuns.createdAt, j.inicioAnterior), lt(aiRuns.createdAt, j.inicio)));
+      .where(
+        and(
+          gte(aiRuns.createdAt, j.inicioAnterior),
+          lt(aiRuns.createdAt, j.inicio),
+          deConversaReal(aiRuns.conversationId),
+        ),
+      );
 
     const taxa = (encerradas: number, comHandoff: number) =>
       encerradas > 0 ? Math.round(((encerradas - comHandoff) / encerradas) * 100) : null;
@@ -176,14 +184,23 @@ export async function serieDiaria(
         (
           select count(*)::int from conversations c
           where (c.created_at at time zone ${fuso})::date = d.dia
+            and not c.is_test
         ) as "conversas",
         (
           select count(*)::int from messages m
           where (m.created_at at time zone ${fuso})::date = d.dia
+            and not exists (
+              select 1 from conversations cv
+               where cv.id = m.conversation_id and cv.is_test
+            )
         ) as "mensagens",
         (
           select coalesce(sum(r.cost_micro_usd), 0)::bigint from ai_runs r
           where (r.created_at at time zone ${fuso})::date = d.dia
+            and not exists (
+              select 1 from conversations cv
+               where cv.id = r.conversation_id and cv.is_test
+            )
         ) as "custoMicroUsd"
       from dias d
       order by d.dia
@@ -224,6 +241,10 @@ export async function assuntosFrequentes(
       cross join lateral jsonb_array_elements_text(r.retrieved_item_ids) as item(id)
       join knowledge_items i on i.id = item.id::uuid
       where r.created_at >= ${j.inicio}
+        and not exists (
+          select 1 from conversations cv
+           where cv.id = r.conversation_id and cv.is_test
+        )
       group by i.title
       order by count(*) desc
       limit 10
