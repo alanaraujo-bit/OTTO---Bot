@@ -10,6 +10,7 @@ import {
 } from '@otto/db';
 import { childLogger, uuidv7 } from '@otto/shared';
 
+import { apenasCortesia, respostaDeCortesia } from '../ai/social.ts';
 import { responder } from '../ai/agente.ts';
 import { ehViolacaoDeUnicidade } from './conflito.ts';
 import { registrarSinal } from '../aprendizado/sinais.ts';
@@ -107,6 +108,23 @@ export async function atenderAutomaticamente(
     log.info('cliente pediu atendimento humano');
     await encaminharParaHumano(tenantId, conversationId, 'cliente_pediu');
     return { respondeu: false, handoff: 'cliente_pediu' };
+  }
+
+  // ── Só cortesia ─────────────────────────────────────────────────────────────
+  // Antes da barreira de fundamento, e essa ordem é o conserto: a barreira
+  // existe para impedir que a Bia invente fato, e um cumprimento não pede fato
+  // nenhum. Passando por ela, "Boa tarde" virava `sem_fundamento`, disparava
+  // "Essa informação eu não tenho confirmada aqui" e ocupava uma pessoa da
+  // equipe — visto em produção, com cliente de verdade.
+  if (apenasCortesia(textoDoCliente)) {
+    log.info('mensagem de cortesia; respondendo sem acionar o agente');
+    await responderCortesia(
+      tenantId,
+      conversationId,
+      mensagemId,
+      respostaDeCortesia(textoDoCliente, new Date(), contexto.fuso),
+    );
+    return { respondeu: true };
   }
 
   // ── Agente ──────────────────────────────────────────────────────────────────
@@ -236,6 +254,45 @@ const AVISO_SEM_CONHECIMENTO =
  * A chave de idempotência é derivada da mensagem do cliente: reprocessar o
  * mesmo evento não manda o aviso duas vezes.
  */
+/**
+ * Grava e enfileira a resposta a uma mensagem de pura cortesia.
+ *
+ * Mesmo caminho de qualquer resposta — mensagem gravada, envio pela fila —, e
+ * por isso herda estado de entrega, idempotência e retry. Não grava `ai_run`
+ * porque nenhum modelo foi chamado: registrar custo zero e confiança zero aqui
+ * sujaria a média de todas as métricas de IA com mensagens que não são IA.
+ */
+async function responderCortesia(
+  tenantId: string,
+  conversationId: string,
+  mensagemId: string,
+  texto: string,
+): Promise<void> {
+  const criada = await withTenant(tenantId, async (tx) => {
+    try {
+      const [linha] = await tx
+        .insert(messages)
+        .values({
+          tenantId,
+          conversationId,
+          direction: 'saida',
+          author: 'agente',
+          contentType: 'texto',
+          body: texto,
+          status: 'pendente',
+          idempotencyKey: `cortesia-${mensagemId}`,
+        })
+        .returning({ id: messages.id });
+      return linha!.id;
+    } catch (erro) {
+      if (!ehViolacaoDeUnicidade(erro, 'messages_idempotency_key')) throw erro;
+      return null;
+    }
+  });
+
+  if (criada) await enfileirarEnvio({ tenantId, messageId: criada });
+}
+
 async function avisarQueVaiChamarAlguem(
   tenantId: string,
   conversationId: string,
