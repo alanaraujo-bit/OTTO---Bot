@@ -1,5 +1,5 @@
 import { and, channels, conversations, eq, messages, withTenant } from '@otto/db';
-import { childLogger, dependenciaExterna, descreverErro, naoEncontrado } from '@otto/shared';
+import { AppError, childLogger, descreverErro, naoEncontrado } from '@otto/shared';
 
 /**
  * Envio de mensagens para os canais.
@@ -137,11 +137,19 @@ async function despachar(
 
     case 'whatsapp':
     case 'instagram': {
-      // O adaptador da Meta entra quando houver app aprovado e credencial. Até
+      // O adaptador da Meta entra quando houver credencial de número (B3). Até
       // lá, falhar explicitamente é o comportamento correto: um envio que
       // silenciosamente não acontece é pior que um erro visível.
+      //
+      // A mensagem vai para a Inbox como está — quem lê é o operador, não um
+      // programador —, então ela diz o que aconteceu e o que fazer. Não usa
+      // `dependenciaExterna`, que acrescenta "não respondeu": ninguém deixou de
+      // responder, o envio ainda não existe.
       throw Object.assign(
-        dependenciaExterna('O canal do WhatsApp/Instagram ainda não está conectado'),
+        new AppError(
+          'dependencia_externa',
+          'O envio pelo WhatsApp ainda não está ligado. A resposta ficou registrada aqui, mas não foi entregue ao cliente.',
+        ),
         { retryable: false },
       );
     }

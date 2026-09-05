@@ -28,5 +28,8 @@ node packages/db/src/migrate.ts
 # é o caso em todo deploy depois do primeiro.
 node packages/db/src/provisionar.ts
 
+# Canal real do ambiente. Inerte quando CANAL_EXTERNAL_ID não existe.
+node packages/db/src/cadastrar-canal.ts
+
 echo "[arranque] iniciando worker"
 exec pnpm --filter @otto/worker start
