@@ -71,6 +71,16 @@ workers.push(
       try {
         const resultado = await interpretarEventoMeta(evento.payload);
 
+        log.info(
+          {
+            webhookEventId,
+            conversas: resultado.conversas.length,
+            estados: resultado.estados,
+            descarte: resultado.descarte,
+          },
+          'entrada interpretada',
+        );
+
         await marcarEvento(webhookEventId, {
           status: resultado.descarte ? 'descartado' : 'processado',
           discardReason: resultado.descarte?.slice(0, 120) ?? null,

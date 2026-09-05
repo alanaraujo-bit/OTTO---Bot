@@ -1,4 +1,4 @@
-import { and, channels, conversations, eq, messages, withTenant } from '@otto/db';
+import { and, channels, contactIdentities, conversations, eq, messages, withTenant } from '@otto/db';
 import { AppError, childLogger, descreverErro, naoEncontrado } from '@otto/shared';
 
 /**
@@ -38,11 +38,27 @@ export async function enviarMensagem(
         canalStatus: channels.status,
         credenciais: channels.credentials,
         canalExterno: channels.externalId,
-        destinatario: conversations.contactId,
+        contactId: conversations.contactId,
+        /**
+         * Para quem a mensagem vai, no identificador do provedor.
+         *
+         * Vem de `contact_identities` e não do telefone do contato: o telefone é
+         * dado de cadastro, editável por quem atende, e mandar mensagem para um
+         * número digitado à mão entregaria a conversa de um cliente a outro. O
+         * `external_id` é o que o provedor nos disse.
+         */
+        destinatario: contactIdentities.externalId,
       })
       .from(messages)
       .innerJoin(conversations, eq(conversations.id, messages.conversationId))
       .innerJoin(channels, eq(channels.id, conversations.channelId))
+      .leftJoin(
+        contactIdentities,
+        and(
+          eq(contactIdentities.contactId, conversations.contactId),
+          eq(contactIdentities.kind, channels.kind),
+        ),
+      )
       .where(eq(messages.id, messageId))
       .limit(1);
     return linha;
@@ -70,6 +86,7 @@ export async function enviarMensagem(
       texto: contexto.corpo ?? '',
       credenciais: contexto.credenciais,
       canalExterno: contexto.canalExterno,
+      destinatario: contexto.destinatario,
     });
 
     await withTenant(tenantId, (tx) =>
@@ -116,6 +133,7 @@ interface PedidoDespacho {
   texto: string;
   credenciais: string | null;
   canalExterno: string | null;
+  destinatario: string | null;
 }
 
 /**
@@ -135,23 +153,39 @@ async function despachar(
       return { externalId: `sim-out-${uuidv7()}` };
     }
 
-    case 'whatsapp':
+    case 'whatsapp': {
+      // Cada uma destas ausências é uma configuração incompleta, não uma falha
+      // passageira: repetir cinco vezes daria o mesmo resultado.
+      if (!pedido.canalExterno) {
+        throw semRetentativa('O canal não tem número da Meta configurado.');
+      }
+      if (!pedido.destinatario) {
+        throw semRetentativa('Não sabemos o WhatsApp deste cliente.');
+      }
+      if (!pedido.credenciais) {
+        throw semRetentativa(
+          'O canal não tem credencial de envio. Conecte o número para que as respostas cheguem ao cliente.',
+        );
+      }
+
+      const { enviarPeloWhatsApp } = await import('./whatsapp.ts');
+      const { wamid } = await enviarPeloWhatsApp({
+        phoneNumberId: pedido.canalExterno,
+        para: pedido.destinatario,
+        texto: pedido.texto,
+        credenciaisCifradas: pedido.credenciais,
+      });
+
+      return { externalId: wamid };
+    }
+
     case 'instagram': {
-      // O adaptador da Meta entra quando houver credencial de número (B3). Até
-      // lá, falhar explicitamente é o comportamento correto: um envio que
-      // silenciosamente não acontece é pior que um erro visível.
-      //
-      // A mensagem vai para a Inbox como está — quem lê é o operador, não um
-      // programador —, então ela diz o que aconteceu e o que fazer. Não usa
-      // `dependenciaExterna`, que acrescenta "não respondeu": ninguém deixou de
-      // responder, o envio ainda não existe.
-      throw Object.assign(
-        new AppError(
-          'dependencia_externa',
-          'O envio pelo WhatsApp ainda não está ligado. A resposta ficou registrada aqui, mas não foi entregue ao cliente.',
-        ),
-        { retryable: false },
-      );
+      // O Instagram é a próxima vertical; falhar explicitamente é melhor que um
+      // envio que silenciosamente não acontece.
+      throw semRetentativa('O envio pelo Instagram ainda não está ligado.');
     }
   }
 }
+
+const semRetentativa = (mensagem: string): Error =>
+  Object.assign(new AppError('dependencia_externa', mensagem), { retryable: false });

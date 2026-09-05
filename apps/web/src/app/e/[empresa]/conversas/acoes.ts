@@ -9,6 +9,7 @@ import {
   resolverConversa,
   responderComoOperador,
 } from '@otto/core/conversations';
+import { enfileirarEnvio } from '@otto/core/queue';
 import { toAppError } from '@otto/shared';
 
 import { exigirAcesso, exigirPermissao } from '@/servidor/sessao.ts';
@@ -82,12 +83,22 @@ export async function acaoResponder(
   chaveIdempotencia: string,
 ): Promise<Resultado> {
   return executar(empresaSlug, 'conversa.responder', async (acesso) => {
-    await responderComoOperador(
+    const { mensagemId, duplicada } = await responderComoOperador(
       acesso.empresa.id,
       conversaId,
       acesso.sessao.usuario.id,
       texto,
       chaveIdempotencia,
     );
+
+    // Sem isto a resposta do operador ficava gravada e **nunca saía**: a
+    // mensagem aparecia na conversa, com o relógio de "aguardando envio", e o
+    // cliente nunca recebia. O caminho da IA já enfileirava; este não.
+    //
+    // Fora da transação de propósito, e só quando a mensagem é nova: enfileirar
+    // a duplicada mandaria de novo o que o clique repetido acabou de impedir.
+    if (!duplicada && mensagemId) {
+      await enfileirarEnvio({ tenantId: acesso.empresa.id, messageId: mensagemId });
+    }
   });
 }

@@ -1,10 +1,4 @@
-import {
-  and,
-  channels,
-  eq,
-  getPlatformDb,
-  webhookEvents,
-} from '@otto/db';
+import { and, channels, eq, getPlatformDb, inArray, messages, webhookEvents, withTenant } from '@otto/db';
 import { childLogger } from '@otto/shared';
 
 import { atenderAutomaticamente } from './atendimento.ts';
@@ -32,6 +26,8 @@ import { receberMensagem } from './ingestao.ts';
 export interface ResultadoEntrada {
   /** Conversas que receberam mensagem nova. */
   conversas: string[];
+  /** Confirmações de entrega aplicadas. */
+  estados: number;
   /** Preenchido quando o evento é válido mas não gera atendimento. */
   descarte: string | null;
   tenantId: string | null;
@@ -46,6 +42,20 @@ interface MensagemMeta {
   text?: { body?: string };
 }
 
+/**
+ * Confirmação de entrega vinda da Meta.
+ *
+ * `id` é o `wamid` que devolvemos no envio — é ele que amarra a confirmação à
+ * mensagem que está na Inbox.
+ */
+interface StatusMeta {
+  id?: string;
+  status?: string;
+  timestamp?: string;
+  recipient_id?: string;
+  errors?: { code?: number; title?: string; message?: string; error_data?: { details?: string } }[];
+}
+
 export interface PayloadMeta {
   object?: string;
   entry?: {
@@ -56,7 +66,7 @@ export interface PayloadMeta {
         metadata?: { phone_number_id?: string };
         contacts?: { wa_id?: string; profile?: { name?: string } }[];
         messages?: MensagemMeta[];
-        statuses?: unknown[];
+        statuses?: StatusMeta[];
       };
     }[];
   }[];
@@ -73,6 +83,7 @@ export async function interpretarEventoMeta(
 ): Promise<ResultadoEntrada> {
   const vazio: ResultadoEntrada = {
     conversas: [],
+    estados: 0,
     descarte: null,
     tenantId: null,
     channelId: null,
@@ -87,15 +98,15 @@ export async function interpretarEventoMeta(
   let descarte: string | null = null;
   let tenantId: string | null = null;
   let channelId: string | null = null;
+  /** Confirmações de entrega aplicadas — um evento só de status não é descarte. */
+  let estados = 0;
 
   for (const mudanca of mudancas) {
     const valor = mudanca.value;
     if (!valor) continue;
 
-    // Confirmações de entrega e leitura chegam pela mesma porta. Refletir isso
-    // no estado da mensagem depende do adaptador de envio (B3).
-    if (!valor.messages?.length) {
-      descarte ??= valor.statuses?.length ? 'evento de status, sem mensagem' : 'evento sem mensagem';
+    if (!valor.messages?.length && !valor.statuses?.length) {
+      descarte ??= 'evento sem mensagem nem status';
       continue;
     }
 
@@ -111,6 +122,17 @@ export async function interpretarEventoMeta(
     tenantId ??= canal.tenantId;
     channelId ??= canal.id;
     const log = childLogger({ tenantId: canal.tenantId, channelId: canal.id });
+
+    // Confirmações de entrega e leitura das mensagens que **nós** mandamos.
+    for (const status of valor.statuses ?? []) {
+      const aplicou = await aplicarStatus(canal.tenantId, status);
+      if (aplicou) estados += 1;
+    }
+
+    if (!valor.messages?.length) {
+      descarte ??= estados > 0 ? null : 'status sem mensagem correspondente';
+      continue;
+    }
 
     for (const mensagem of valor.messages) {
       const texto = mensagem.type === 'text' ? mensagem.text?.body?.trim() : null;
@@ -149,12 +171,85 @@ export async function interpretarEventoMeta(
     }
   }
 
+  const semEfeito = conversas.length === 0 && estados === 0;
   return {
     conversas,
-    descarte: conversas.length === 0 ? (descarte ?? 'nada a processar') : null,
+    estados,
+    descarte: semEfeito ? (descarte ?? 'nada a processar') : null,
     tenantId,
     channelId,
   };
+}
+
+/**
+ * Aplica uma confirmação de entrega à mensagem que ela descreve.
+ *
+ * Duas regras decidem tudo aqui:
+ *
+ * **O estado só avança.** A Meta entrega fora de ordem, então `delivered` chega
+ * depois de `read` com frequência suficiente para importar. Sem a guarda, a
+ * Inbox mostraria uma mensagem "voltando" de lida para entregue — e o operador
+ * confia nesse ícone para saber se precisa insistir com o cliente. A guarda
+ * está no `WHERE` e não em código: duas confirmações simultâneas do mesmo
+ * `wamid` seriam uma corrida que a leitura-antes-da-escrita perderia.
+ *
+ * **`failed` é exceção.** Ele pode chegar depois de `sent` e precisa vencer,
+ * porque significa que a mensagem não chegou. Só não vence `lida`, que é prova
+ * de que chegou.
+ */
+async function aplicarStatus(tenantId: string, status: StatusMeta): Promise<boolean> {
+  const wamid = status.id;
+  const nome = status.status;
+  if (!wamid || !nome) return false;
+
+  const mapa: Record<string, 'enviada' | 'entregue' | 'lida' | 'falhou'> = {
+    sent: 'enviada',
+    delivered: 'entregue',
+    read: 'lida',
+    failed: 'falhou',
+  };
+
+  const novo = mapa[nome];
+  // `deleted` e status futuros que ainda não sabemos tratar: ignorar é melhor
+  // que adivinhar o que significam para o operador.
+  if (!novo) return false;
+
+  const quando = status.timestamp ? new Date(Number(status.timestamp) * 1000) : new Date();
+
+  // De quais estados vale a pena avançar para este.
+  const anteriores: Record<typeof novo, ('pendente' | 'enviando' | 'enviada' | 'entregue')[]> = {
+    enviada: ['pendente', 'enviando'],
+    entregue: ['pendente', 'enviando', 'enviada'],
+    lida: ['pendente', 'enviando', 'enviada', 'entregue'],
+    falhou: ['pendente', 'enviando', 'enviada', 'entregue'],
+  };
+
+  const campos: Record<string, unknown> = { status: novo };
+  if (novo === 'enviada') campos.sentAt = quando;
+  if (novo === 'entregue') campos.deliveredAt = quando;
+  if (novo === 'lida') campos.readAt = quando;
+  if (novo === 'falhou') {
+    campos.failedAt = quando;
+    const erro = status.errors?.[0];
+    campos.failureReason =
+      erro?.error_data?.details ?? erro?.title ?? erro?.message ?? 'O WhatsApp não entregou.';
+  }
+
+  const atualizadas = await withTenant(tenantId, (tx) =>
+    tx
+      .update(messages)
+      .set(campos)
+      .where(
+        and(
+          eq(messages.tenantId, tenantId),
+          eq(messages.externalId, wamid),
+          inArray(messages.status, anteriores[novo]),
+        ),
+      )
+      .returning({ id: messages.id }),
+  );
+
+  return atualizadas.length > 0;
 }
 
 /**

@@ -20,7 +20,8 @@
   "dependencies": {
     "@otto/core": "workspace:*",
     "drizzle-orm": "^0.45.2",
-    "pg": "^8.23.0"
+    "pg": "^8.23.0",
+    "@otto/shared": "workspace:*"
   },
   "devDependencies": {
     "@types/pg": "^8.23.1",

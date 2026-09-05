@@ -31,5 +31,8 @@ node packages/db/src/provisionar.ts
 # Canal real do ambiente. Inerte quando CANAL_EXTERNAL_ID não existe.
 node packages/db/src/cadastrar-canal.ts
 
+# Base de conhecimento de validação. Inerte sem SEMEAR_CONHECIMENTO=1.
+node packages/db/src/semear-conhecimento.ts
+
 echo "[arranque] iniciando worker"
 exec pnpm --filter @otto/worker start

@@ -1,5 +1,7 @@
 import { pathToFileURL } from 'node:url';
 
+import { cifrar } from '@otto/shared';
+
 import { and, channels, eq, getPlatformDb, tenants } from './index.ts';
 
 /**
@@ -17,12 +19,15 @@ import { and, channels, eq, getPlatformDb, tenants } from './index.ts';
  *   CANAL_NOME           nome interno, o que aparece na Inbox
  *   CANAL_HANDLE         como o número aparece para o cliente (+55 …)
  *   CANAL_TIPO           `whatsapp` (padrão) ou `instagram`
+ *   CANAL_TOKEN          token de envio; cifrado antes de tocar o banco
  *
- * **Não grava token.** O `credentials` é cifrado com `ENCRYPTION_KEY` e essa
- * cifragem ainda não existe no código; gravar segredo em texto claro numa
- * coluna que a Inbox lê seria pior que não ter envio. O canal cadastrado aqui
- * **recebe** mensagem — que é o que depende dele. O envio continua barrado no
- * adaptador, de forma visível, até o B3.
+ * O `CANAL_TOKEN` **nunca** é gravado em texto claro: passa por `cifrar()`
+ * (AES-256-GCM com `ENCRYPTION_KEY`) antes do `INSERT`. Sem ele o canal recebe
+ * mensagem normalmente e o envio falha de forma visível, dizendo o que falta.
+ *
+ * Depois de cadastrar, **apague a variável do serviço**. Ela cumpriu o papel: o
+ * valor está cifrado no banco, e uma variável de ambiente é o lugar mais fácil
+ * de vazar um segredo por engano.
  *
  * Idempotente pelo `(kind, external_id)`, que é único no banco: rodar de novo
  * confirma o estado e atualiza nome/handle em vez de duplicar.
@@ -38,6 +43,11 @@ export async function cadastrarCanal(): Promise<void> {
 
   const db = getPlatformDb();
   const tenantId = await resolverEmpresa(slug);
+
+  // Cifra antes de qualquer escrita: se `ENCRYPTION_KEY` estiver ausente ou
+  // malformada, o arranque falha aqui, com o segredo ainda fora do banco.
+  const token = process.env.CANAL_TOKEN?.trim();
+  const credenciais = token ? cifrar(token) : null;
 
   const [existente] = await db
     .select({ id: channels.id, tenantId: channels.tenantId })
@@ -58,7 +68,14 @@ export async function cadastrarCanal(): Promise<void> {
   if (existente) {
     await db
       .update(channels)
-      .set({ name: nome, externalHandle: handle, status: 'conectado' })
+      .set({
+        name: nome,
+        externalHandle: handle,
+        status: 'conectado',
+        // Só sobrescreve a credencial quando veio uma nova: rodar sem
+        // CANAL_TOKEN não deve apagar a que já está guardada.
+        ...(credenciais ? { credentials: credenciais, connectedAt: new Date() } : {}),
+      })
       .where(eq(channels.id, existente.id));
     console.log(`[canal] ${tipo} ${externalId} confirmado (${existente.id})`);
     return;
@@ -73,6 +90,7 @@ export async function cadastrarCanal(): Promise<void> {
       status: 'conectado',
       externalId,
       externalHandle: handle,
+      credentials: credenciais,
       connectedAt: new Date(),
     })
     .returning({ id: channels.id });
