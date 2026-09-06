@@ -1,5 +1,6 @@
 export {
   agregarSinais,
+  ehCortesia,
   registrarSinal,
   type RegistroSinal,
   type SugestaoGerada,

@@ -12,6 +12,7 @@ import {
 import { childLogger, dias } from '@otto/shared';
 
 import { rotaPara } from '../ai/roteador.ts';
+import { apenasCortesia } from '../ai/social.ts';
 import { agruparPorIntencao, type PerguntaParaAgrupar } from './agrupamento.ts';
 
 /**
@@ -45,7 +46,31 @@ export interface RegistroSinal {
   dados?: Record<string, unknown>;
 }
 
+/**
+ * Se a pergunta que originou o sinal não pede informação nenhuma.
+ *
+ * Um cumprimento não é uma lacuna de conhecimento. O atendimento já intercepta
+ * cortesia antes da barreira de fundamento, mas o sinal tem outros caminhos —
+ * uma resposta corrigida por um humano, um cliente insatisfeito logo depois de
+ * um "boa noite" — e por qualquer um deles o resíduo chegaria ao agrupamento.
+ * Visto em produção: "Boa noite" e "Boa tarde" agruparam a 0,792, e um terceiro
+ * cumprimento faria o produto sugerir criar conhecimento sobre saudação.
+ *
+ * A checagem é no texto cru, antes de `normalizar`: a normalização descarta
+ * palavras de até duas letras e ordena o resto, então "oi" viraria string vazia
+ * e um cumprimento de duas palavras pode sair fora de ordem — em ambos os casos
+ * `apenasCortesia` deixaria de reconhecer o que reconhece aqui.
+ */
+export function ehCortesia(pergunta: string | null | undefined): boolean {
+  return Boolean(pergunta && apenasCortesia(pergunta));
+}
+
 export async function registrarSinal(sinal: RegistroSinal): Promise<void> {
+  // Cortesia nunca vira aprendizado, por nenhum caminho. Descartar aqui, e não
+  // no agrupamento, é o que faz a garantia valer para os cinco tipos de sinal —
+  // inclusive os que `agregarSinais` ainda não lê.
+  if (ehCortesia(sinal.pergunta)) return;
+
   await withTenant(sinal.tenantId, (tx) =>
     tx.insert(knowledgeSignals).values({
       tenantId: sinal.tenantId,
