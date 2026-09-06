@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { AtSign, MessageCircle, Search, FlaskConical, X } from 'lucide-react';
-import { cn, Etiqueta, Vazio, tempoRelativo } from '@otto/ui';
+import { Avatar, cn, Etiqueta, Vazio, tempoRelativo } from '@otto/ui';
 
 import type { ContagemInbox, ItemInbox, FiltroStatus } from '@otto/core/conversations';
 
@@ -200,17 +200,12 @@ export function ListaConversas({
                   )}
 
                   <span className="relative mt-0.5 shrink-0">
-                    <span
-                      aria-hidden
-                      className={cn(
-                        'flex size-8 items-center justify-center rounded-full text-xs font-medium',
-                        esperando
-                          ? 'bg-atencao-suave text-atencao'
-                          : 'bg-superficie-3 text-texto-2',
-                      )}
-                    >
-                      {inicial(c.contatoNome)}
-                    </span>
+                    <Avatar
+                      semente={c.contatoId}
+                      nome={c.contatoNome}
+                      aguardando={esperando}
+                      tamanho="sm"
+                    />
                     {(c.canal === 'whatsapp' || c.canal === 'instagram') && (
                       <span className="bg-superficie absolute -right-1 -bottom-1 flex size-3.5 items-center justify-center rounded-full">
                         <Icone aria-hidden strokeWidth={2} className="text-texto-3 size-2.5" />
@@ -279,6 +274,3 @@ export function ListaConversas({
   );
 }
 
-function inicial(nome: string | null): string {
-  return nome?.trim()?.[0]?.toUpperCase() ?? '?';
-}

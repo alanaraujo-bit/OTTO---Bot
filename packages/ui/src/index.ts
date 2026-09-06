@@ -7,6 +7,7 @@ export { Cartao, type CartaoProps } from './cartao.tsx';
 export { Etiqueta, type EtiquetaProps } from './etiqueta.tsx';
 export { Esqueleto } from './esqueleto.tsx';
 export { Anel } from './anel.tsx';
+export { Avatar, type AvatarProps, type TamanhoAvatar } from './avatar.tsx';
 export { Vazio, type VazioProps } from './vazio.tsx';
 export { ProvedorTema, SeletorTema, useTema, scriptTema, type Tema } from './tema.tsx';
 

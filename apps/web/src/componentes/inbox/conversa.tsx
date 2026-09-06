@@ -9,13 +9,19 @@ import {
   Check,
   CheckCheck,
   Clock,
+  CornerUpLeft,
   RotateCcw,
   Send,
   UserRound,
+  X,
 } from 'lucide-react';
-import { Botao, cn, Etiqueta, formatarTelefone } from '@otto/ui';
+import { Avatar, Botao, cn, Etiqueta, formatarTelefone } from '@otto/ui';
 
-import type { DetalheConversa, MensagemDaConversa } from '@otto/core/conversations';
+import type {
+  DetalheConversa,
+  MensagemCitada,
+  MensagemDaConversa,
+} from '@otto/core/conversations';
 import {
   acaoAssumir,
   acaoDevolver,
@@ -53,6 +59,23 @@ export function PainelConversa({
   const [erro, setErro] = useState<string | null>(null);
   const [pendente, iniciarTransicao] = useTransition();
 
+  /**
+   * A mensagem que a próxima resposta vai citar.
+   *
+   * Vive aqui, e não dentro do redator, porque quem escolhe é o histórico e
+   * quem usa é o campo de escrita — são irmãos, e o estado precisa ser do pai.
+   */
+  const [respondendo, setRespondendo] = useState<MensagemDaConversa | null>(null);
+
+  // A mensagem citada pode sumir da tela enquanto a pessoa escreve: outro
+  // operador resolveu a conversa, o histórico recarregou. Citar algo que não
+  // está mais lá faria o envio falhar na validação do servidor.
+  useEffect(() => {
+    if (respondendo && !conversa.mensagens.some((m) => m.id === respondendo.id)) {
+      setRespondendo(null);
+    }
+  }, [conversa.mensagens, respondendo]);
+
   const minha = conversa.atribuidaA?.id === usuarioId;
   const iaAtiva = conversa.modo === 'automatico' && !conversa.iaPausadaAte;
 
@@ -77,17 +100,12 @@ export function PainelConversa({
           <ArrowLeft aria-hidden strokeWidth={1.5} className="size-4" />
         </Link>
 
-        <span
-          aria-hidden
-          className={cn(
-            'flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-medium',
-            conversa.status === 'aguardando_humano'
-              ? 'bg-atencao-suave text-atencao'
-              : 'bg-superficie-3 text-texto-2',
-          )}
-        >
-          {(conversa.contato.nome ?? '?').trim().charAt(0).toUpperCase()}
-        </span>
+        <Avatar
+          semente={conversa.contato.id}
+          nome={conversa.contato.nome}
+          aguardando={conversa.status === 'aguardando_humano'}
+          tamanho="md"
+        />
 
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold text-texto">
@@ -164,10 +182,19 @@ export function PainelConversa({
         </p>
       )}
 
-      <Historico mensagens={conversa.mensagens} />
+      <Historico
+        mensagens={conversa.mensagens}
+        podeResponder={permissoes.responder}
+        aoResponder={setRespondendo}
+      />
 
       {permissoes.responder ? (
-        <Redator empresaSlug={empresaSlug} conversaId={conversa.id} />
+        <Redator
+          empresaSlug={empresaSlug}
+          conversaId={conversa.id}
+          respondendo={respondendo}
+          aoCancelarCitacao={() => setRespondendo(null)}
+        />
       ) : (
         <p className="area-segura-base border-t border-linha px-3 py-3 text-xs text-texto-3">
           Seu perfil permite acompanhar esta conversa, mas não responder.
@@ -177,13 +204,37 @@ export function PainelConversa({
   );
 }
 
-function Historico({ mensagens }: { mensagens: MensagemDaConversa[] }) {
+function Historico({
+  mensagens,
+  podeResponder,
+  aoResponder,
+}: {
+  mensagens: MensagemDaConversa[];
+  podeResponder: boolean;
+  aoResponder: (mensagem: MensagemDaConversa) => void;
+}) {
   const fim = useRef<HTMLDivElement>(null);
+  const [destacada, setDestacada] = useState<string | null>(null);
 
   // Conversa abre no fim, como qualquer aplicativo de mensagem.
   useEffect(() => {
     fim.current?.scrollIntoView({ block: 'end' });
   }, [mensagens.length]);
+
+  /**
+   * Ir da citação até a mensagem citada.
+   *
+   * Rolar sem marcar não resolve nada: a pessoa chega numa tela de mensagens
+   * parecidas e não sabe qual era. O destaque diz "é esta", e apaga sozinho —
+   * um realce permanente viraria sujeira na conversa.
+   */
+  function irAte(id: string) {
+    const alvo = document.getElementById(`mensagem-${id}`);
+    if (!alvo) return;
+    alvo.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    setDestacada(id);
+    window.setTimeout(() => setDestacada((atual) => (atual === id ? null : atual)), 1800);
+  }
 
   if (mensagens.length === 0) {
     return (
@@ -203,7 +254,13 @@ function Historico({ mensagens }: { mensagens: MensagemDaConversa[] }) {
           return (
             <Fragment key={m.id}>
               {mostrarData && <SeparadorDia data={m.criadaEm} />}
-              <Bolha mensagem={m} />
+              <Bolha
+                mensagem={m}
+                destacada={destacada === m.id}
+                podeResponder={podeResponder}
+                aoResponder={aoResponder}
+                aoIrAteCitada={irAte}
+              />
             </Fragment>
           );
         })}
@@ -239,7 +296,78 @@ function SeparadorDia({ data }: { data: Date }) {
   );
 }
 
-function Bolha({ mensagem }: { mensagem: MensagemDaConversa }) {
+/** Quem escreveu, como se lê numa citação. */
+function nomeDoAutor(autor: string, autorNome: string | null): string {
+  if (autor === 'cliente') return 'Cliente';
+  if (autor === 'agente') return 'Bia';
+  return autorNome ?? 'Equipe';
+}
+
+/**
+ * O trecho citado, dentro da bolha que responde.
+ *
+ * Clicar leva até a original. É um botão de verdade, e não uma `div` com
+ * `onClick`, porque quem opera o dia inteiro navega no teclado — e porque um
+ * elemento clicável que o leitor de tela não anuncia é um elemento que não
+ * existe para quem depende dele.
+ */
+function TrechoCitado({
+  citada,
+  nossa,
+  aoIr,
+}: {
+  citada: MensagemCitada;
+  nossa: boolean;
+  aoIr: (id: string) => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => aoIr(citada.id)}
+      className={cn(
+        'mb-1.5 flex w-full gap-2 rounded-xs border-l-2 px-2 py-1 text-left',
+        'transition-colors duration-[var(--dur-controle)]',
+        nossa
+          ? 'border-l-marca-contraste/45 bg-marca-contraste/12 hover:bg-marca-contraste/20'
+          : 'border-l-marca bg-superficie-3/70 hover:bg-superficie-3',
+      )}
+    >
+      <span className="min-w-0 flex-1">
+        <span
+          className={cn(
+            'block text-2xs font-semibold',
+            nossa ? 'text-marca-contraste/90' : 'text-marca',
+          )}
+        >
+          {nomeDoAutor(citada.autor, citada.autorNome)}
+        </span>
+        {/* Duas linhas no máximo: a citação orienta, não repete a conversa. */}
+        <span
+          className={cn(
+            'mt-0.5 line-clamp-2 block text-xs break-words',
+            nossa ? 'text-marca-contraste/75' : 'text-texto-2',
+          )}
+        >
+          {citada.corpo ?? 'Mensagem sem texto'}
+        </span>
+      </span>
+    </button>
+  );
+}
+
+function Bolha({
+  mensagem,
+  destacada,
+  podeResponder,
+  aoResponder,
+  aoIrAteCitada,
+}: {
+  mensagem: MensagemDaConversa;
+  destacada: boolean;
+  podeResponder: boolean;
+  aoResponder: (mensagem: MensagemDaConversa) => void;
+  aoIrAteCitada: (id: string) => void;
+}) {
   const doCliente = mensagem.autor === 'cliente';
   const falhou = mensagem.status === 'falhou';
 
@@ -255,49 +383,104 @@ function Bolha({ mensagem }: { mensagem: MensagemDaConversa }) {
     );
   }
 
+  // A citação dentro da nossa bolha vive sobre o verde da marca; dentro da do
+  // cliente, sobre a superfície neutra. São contrastes opostos, e a bolha que
+  // falhou volta a ser clara — por isso `nossa` não é simplesmente `!doCliente`.
+  const citacaoSobreMarca = !doCliente && !falhou;
+
   return (
-    <div className={cn('flex', doCliente ? 'justify-start' : 'justify-end')}>
+    <div
+      id={`mensagem-${mensagem.id}`}
+      className={cn(
+        'group/bolha flex scroll-mt-4',
+        doCliente ? 'justify-start' : 'justify-end',
+      )}
+    >
       <div
         className={cn(
-          doCliente ? 'max-w-[78%] items-start md:max-w-[32rem]' : 'max-w-[85%] items-end md:max-w-[34rem]',
+          'flex items-center gap-1',
+          doCliente ? 'flex-row' : 'flex-row-reverse',
+          doCliente ? 'max-w-[78%] md:max-w-[32rem]' : 'max-w-[85%] md:max-w-[34rem]',
         )}
       >
-        <div
-          className={cn(
-            'rounded-md px-3 py-2 text-md leading-relaxed',
-            doCliente
-              ? 'rounded-tl-xs bg-superficie-2 text-texto'
-              : falhou
-                ? 'rounded-tr-xs border border-falha/30 bg-falha-suave text-texto'
-                : 'rounded-tr-xs bg-marca text-marca-contraste',
+        <div className={cn('min-w-0', doCliente ? 'items-start' : 'items-end')}>
+          <div
+            className={cn(
+              'rounded-md px-3 py-2 text-md leading-relaxed',
+              'transition-[box-shadow,transform] duration-[var(--dur-estado)]',
+              doCliente
+                ? 'rounded-tl-xs bg-superficie-2 text-texto'
+                : falhou
+                  ? 'rounded-tr-xs border border-falha/30 bg-falha-suave text-texto'
+                  : 'rounded-tr-xs bg-marca text-marca-contraste',
+              // O destaque de "é esta a mensagem citada" é um anel, e não uma
+              // troca de cor de fundo: a cor da bolha já significa quem falou.
+              destacada && 'ring-marca ring-2 ring-offset-2 ring-offset-[var(--cor-fundo)]',
+            )}
+          >
+            {mensagem.respondendoA && (
+              <TrechoCitado
+                citada={mensagem.respondendoA}
+                nossa={citacaoSobreMarca}
+                aoIr={aoIrAteCitada}
+              />
+            )}
+            {/* `whitespace-pre-wrap` preserva as quebras que a pessoa digitou. */}
+            <p className="whitespace-pre-wrap break-words">{mensagem.corpo ?? '—'}</p>
+          </div>
+
+          <div
+            className={cn(
+              'mt-1 flex items-center gap-1.5 px-0.5 text-2xs text-texto-3',
+              doCliente ? 'justify-start' : 'justify-end',
+            )}
+          >
+            {!doCliente && (
+              <span>
+                {mensagem.autor === 'agente' ? 'Bia' : (mensagem.autorNome ?? 'Equipe')}
+              </span>
+            )}
+            <time dateTime={mensagem.criadaEm.toISOString()}>
+              {mensagem.criadaEm.toLocaleTimeString('pt-BR', {
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
+            </time>
+            {!doCliente && <Situacao status={mensagem.status} />}
+          </div>
+
+          {falhou && mensagem.falha && (
+            <p className="mt-0.5 px-0.5 text-2xs text-falha">Não enviada: {mensagem.falha}</p>
           )}
-        >
-          {/* `whitespace-pre-wrap` preserva as quebras que a pessoa digitou. */}
-          <p className="whitespace-pre-wrap break-words">{mensagem.corpo ?? '—'}</p>
         </div>
 
-        <div
-          className={cn(
-            'mt-1 flex items-center gap-1.5 px-0.5 text-2xs text-texto-3',
-            doCliente ? 'justify-start' : 'justify-end',
-          )}
-        >
-          {!doCliente && (
-            <span>
-              {mensagem.autor === 'agente' ? 'Bia' : (mensagem.autorNome ?? 'Equipe')}
-            </span>
-          )}
-          <time dateTime={mensagem.criadaEm.toISOString()}>
-            {mensagem.criadaEm.toLocaleTimeString('pt-BR', {
-              hour: '2-digit',
-              minute: '2-digit',
-            })}
-          </time>
-          {!doCliente && <Situacao status={mensagem.status} />}
-        </div>
+        {/*
+          Responder esta mensagem.
 
-        {falhou && mensagem.falha && (
-          <p className="mt-0.5 px-0.5 text-2xs text-falha">Não enviada: {mensagem.falha}</p>
+          Aparece ao passar o mouse ou ao chegar pelo teclado; no toque fica
+          sempre visível, discreto. O WhatsApp usa toque longo, e aqui isso
+          custaria caro: no navegador o toque longo disputa com a seleção nativa
+          de texto, e desligar a seleção tiraria de quem atende a capacidade de
+          copiar um endereço ou um número de pedido de dentro da mensagem — que
+          é coisa que se faz o dia inteiro num atendimento.
+        */}
+        {podeResponder && (
+          <button
+            type="button"
+            onClick={() => aoResponder(mensagem)}
+            aria-label={`Responder a mensagem de ${nomeDoAutor(mensagem.autor, mensagem.autorNome)}`}
+            title="Responder"
+            className={cn(
+              'text-texto-3 hover:bg-superficie-2 hover:text-texto flex size-7 shrink-0',
+              'items-center justify-center rounded-full',
+              'transition-[opacity,color,background-color] duration-[var(--dur-controle)]',
+              'focus-visible:outline-marca focus-visible:outline-2 focus-visible:outline-offset-1',
+              'max-md:opacity-60',
+              'md:opacity-0 md:group-hover/bolha:opacity-100 md:focus-visible:opacity-100',
+            )}
+          >
+            <CornerUpLeft aria-hidden strokeWidth={1.5} className="size-3.5" />
+          </button>
         )}
       </div>
     </div>
@@ -334,23 +517,42 @@ function Situacao({ status }: { status: string }) {
  * A chave de idempotência é gerada aqui, uma por envio: clique duplo ou
  * reconexão no meio do caminho não manda a mesma mensagem duas vezes.
  */
-function Redator({ empresaSlug, conversaId }: { empresaSlug: string; conversaId: string }) {
+function Redator({
+  empresaSlug,
+  conversaId,
+  respondendo,
+  aoCancelarCitacao,
+}: {
+  empresaSlug: string;
+  conversaId: string;
+  respondendo: MensagemDaConversa | null;
+  aoCancelarCitacao: () => void;
+}) {
   const router = useRouter();
   const [texto, setTexto] = useState('');
   const [erro, setErro] = useState<string | null>(null);
   const [enviando, iniciarTransicao] = useTransition();
   const campo = useRef<HTMLTextAreaElement>(null);
 
+  // Escolher uma mensagem para responder é dizer que vai escrever agora. Sem o
+  // foco, a pessoa clica em "responder" e ainda precisa clicar no campo.
+  useEffect(() => {
+    if (respondendo) campo.current?.focus();
+  }, [respondendo]);
+
   function enviar() {
     const corpo = texto.trim();
     if (!corpo || enviando) return;
 
     const chave = `op:${crypto.randomUUID()}`;
+    // Lido antes de limpar: o envio é assíncrono e a citação some da tela agora.
+    const citada = respondendo?.id ?? null;
     setTexto('');
     setErro(null);
+    aoCancelarCitacao();
 
     iniciarTransicao(async () => {
-      const r = await acaoResponder(empresaSlug, conversaId, corpo, chave);
+      const r = await acaoResponder(empresaSlug, conversaId, corpo, chave, citada);
       if (!r.ok) {
         setErro(r.erro ?? 'Não foi possível enviar.');
         // Devolve o texto para a pessoa não perder o que escreveu.
@@ -367,6 +569,11 @@ function Redator({ empresaSlug, conversaId }: { empresaSlug: string; conversaId:
       evento.preventDefault();
       enviar();
     }
+    // Esc desiste da citação sem apagar o que já foi escrito.
+    if (evento.key === 'Escape' && respondendo) {
+      evento.preventDefault();
+      aoCancelarCitacao();
+    }
   }
 
   return (
@@ -375,6 +582,28 @@ function Redator({ empresaSlug, conversaId }: { empresaSlug: string; conversaId:
         <p role="alert" className="mb-2 text-xs text-falha">
           {erro}
         </p>
+      )}
+
+      {respondendo && (
+        <div className="mx-auto mb-2 flex max-w-2xl items-start gap-2 rounded-sm border-l-2 border-l-marca bg-superficie-2 py-1.5 pr-1.5 pl-2.5">
+          <span className="min-w-0 flex-1">
+            <span className="flex items-center gap-1.5 text-2xs font-semibold text-marca">
+              <CornerUpLeft aria-hidden strokeWidth={1.75} className="size-3" />
+              Respondendo {nomeDoAutor(respondendo.autor, respondendo.autorNome)}
+            </span>
+            <span className="mt-0.5 line-clamp-2 block text-xs break-words text-texto-2">
+              {respondendo.corpo ?? 'Mensagem sem texto'}
+            </span>
+          </span>
+          <button
+            type="button"
+            onClick={aoCancelarCitacao}
+            aria-label="Cancelar resposta a esta mensagem"
+            className="text-texto-3 hover:bg-superficie-3 hover:text-texto flex size-6 shrink-0 items-center justify-center rounded-xs"
+          >
+            <X aria-hidden strokeWidth={1.5} className="size-3.5" />
+          </button>
+        </div>
       )}
 
       <div className="mx-auto flex max-w-2xl items-end gap-2">
