@@ -41,6 +41,14 @@ interface MensagemMeta {
   timestamp?: string;
   type?: string;
   text?: { body?: string };
+  /**
+   * Presente quando o cliente respondeu uma mensagem específica.
+   *
+   * `id` é o `wamid` da mensagem citada — pode ser uma nossa ou uma dele. Nem
+   * sempre está no nosso banco: uma conversa que começou antes de o número ser
+   * conectado tem histórico que nunca passou por aqui.
+   */
+  context?: { id?: string };
 }
 
 /**
@@ -153,6 +161,7 @@ export async function interpretarEventoMeta(
         nomePerfil: perfil?.profile?.name ?? null,
         telefone: /^\d{10,15}$/.test(mensagem.from) ? mensagem.from : null,
         mensagemExterna: mensagem.id,
+        respondendoExterno: mensagem.context?.id ?? null,
         texto,
         enviadaEm: mensagem.timestamp ? new Date(Number(mensagem.timestamp) * 1000) : undefined,
       });

@@ -1,4 +1,13 @@
-import { and, channels, contactIdentities, conversations, eq, messages, withTenant } from '@otto/db';
+import {
+  and,
+  channels,
+  contactIdentities,
+  conversations,
+  eq,
+  messages,
+  sql,
+  withTenant,
+} from '@otto/db';
 import { AppError, childLogger, descreverErro, naoEncontrado } from '@otto/shared';
 
 import { publicarEvento } from '../events/barramento.ts';
@@ -50,6 +59,21 @@ export async function enviarMensagem(
          * `external_id` é o que o provedor nos disse.
          */
         destinatario: contactIdentities.externalId,
+        /**
+         * O `wamid` da mensagem citada, quando esta é uma resposta.
+         *
+         * Subconsulta e não join: um join a mais na tabela de mensagens só para
+         * ler uma coluna que é nula na maioria esmagadora das linhas custaria
+         * em todo envio, e a política de RLS vale igual aqui dentro.
+         *
+         * Pode voltar nulo mesmo havendo citação — se a mensagem citada ainda
+         * não chegou a sair, ela não tem `wamid`. Nesse caso o envio segue sem
+         * a citação: uma resposta sem citação chega, e uma resposta que não sai
+         * não chega.
+         */
+        respondendoWamid: sql<
+          string | null
+        >`(select p.external_id from messages p where p.id = ${messages.replyToMessageId})`,
       })
       .from(messages)
       .innerJoin(conversations, eq(conversations.id, messages.conversationId))
@@ -89,6 +113,7 @@ export async function enviarMensagem(
       credenciais: contexto.credenciais,
       canalExterno: contexto.canalExterno,
       destinatario: contexto.destinatario,
+      respondendoWamid: contexto.respondendoWamid,
     });
 
     await withTenant(tenantId, (tx) =>
@@ -140,6 +165,8 @@ interface PedidoDespacho {
   credenciais: string | null;
   canalExterno: string | null;
   destinatario: string | null;
+  /** `wamid` da mensagem citada. Nulo quando a resposta não cita nenhuma. */
+  respondendoWamid: string | null;
 }
 
 /**
@@ -180,6 +207,7 @@ async function despachar(
         para: pedido.destinatario,
         texto: pedido.texto,
         credenciaisCifradas: pedido.credenciais,
+        respondendoWamid: pedido.respondendoWamid,
       });
 
       return { externalId: wamid };

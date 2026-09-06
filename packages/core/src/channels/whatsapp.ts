@@ -23,6 +23,14 @@ export interface EnvioWhatsApp {
   texto: string;
   /** Credencial cifrada, como está em `channels.credentials`. */
   credenciaisCifradas: string;
+  /**
+   * `wamid` da mensagem sendo respondida, quando é uma resposta citada.
+   *
+   * É o que faz a citação aparecer no aplicativo do cliente. Sem isto a
+   * resposta chega como mensagem solta, e quem perguntou três coisas não sabe
+   * qual delas foi respondida.
+   */
+  respondendoWamid?: string | null;
 }
 
 export interface RespostaEnvio {
@@ -63,6 +71,11 @@ export async function enviarPeloWhatsApp(pedido: EnvioWhatsApp): Promise<Respost
         // `preview_url: false` é deliberado: link com prévia muda a aparência da
         // mensagem sem que ninguém tenha pedido, e a prévia é buscada pela Meta.
         text: { preview_url: false, body: pedido.texto },
+        // Omitido quando não há citação: mandar `context` nulo faz a Meta
+        // recusar o envio inteiro por payload inválido.
+        ...(pedido.respondendoWamid
+          ? { context: { message_id: pedido.respondendoWamid } }
+          : {}),
       }),
       signal: cancelamento,
     });

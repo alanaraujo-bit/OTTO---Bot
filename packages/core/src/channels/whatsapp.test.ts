@@ -76,6 +76,45 @@ describe('envio bem-sucedido', () => {
   });
 });
 
+/**
+ * Resposta citada.
+ *
+ * O `context` é o que faz a citação aparecer no aplicativo do cliente. Quem
+ * perguntou três coisas e recebe uma resposta solta não sabe qual delas foi
+ * respondida — e é justamente a conversa de várias perguntas que precisa disto.
+ */
+describe('resposta a uma mensagem específica', () => {
+  it('cita a mensagem original quando há wamid', async () => {
+    const f = responderCom(200, { messages: [{ id: 'wamid.NOVA' }] });
+    await enviarPeloWhatsApp({ ...pedido(), respondendoWamid: 'wamid.ORIGINAL' });
+
+    const corpo = JSON.parse(f.mock.calls[0]![1].body);
+    expect(corpo.context).toEqual({ message_id: 'wamid.ORIGINAL' });
+  });
+
+  it('não manda a chave `context` quando não há citação', async () => {
+    // Não é firula de formato: `context` presente e vazio faz a Meta recusar o
+    // envio inteiro por payload inválido, e aí **nenhuma** resposta de operador
+    // sairia — não só as citadas. A ausência da chave é o contrato.
+    const f = responderCom(200, { messages: [{ id: 'wamid.X' }] });
+    await enviarPeloWhatsApp({ ...pedido(), respondendoWamid: null });
+
+    const corpo = JSON.parse(f.mock.calls[0]![1].body);
+    expect(corpo).not.toHaveProperty('context');
+  });
+
+  it('envia sem citação quando a original ainda não tem wamid', async () => {
+    // A mensagem citada pode não ter saído ainda. Deixar de enviar seria pior:
+    // resposta sem citação chega, resposta que não sai não chega.
+    const f = responderCom(200, { messages: [{ id: 'wamid.X' }] });
+    await enviarPeloWhatsApp({ ...pedido(), respondendoWamid: undefined });
+
+    const corpo = JSON.parse(f.mock.calls[0]![1].body);
+    expect(corpo).not.toHaveProperty('context');
+    expect(corpo.text.body).toBe('Bom dia! Abrimos às 7h.');
+  });
+});
+
 describe('erros que valem nova tentativa', () => {
   it('429 é recuperável', async () => {
     responderCom(429, { error: { message: 'rate limited', code: 4 } });

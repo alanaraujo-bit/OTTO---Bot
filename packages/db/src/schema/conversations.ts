@@ -141,6 +141,20 @@ export const messages = pgTable(
     /** Mídia, localização, contato — formato por tipo em `@otto/core/conversations`. */
     attachments: jsonb('attachments').notNull().default(sql`'[]'::jsonb`),
 
+    /**
+     * A mensagem que esta responde, quando é uma resposta citada.
+     *
+     * Aponta para outra linha desta mesma tabela, e não guarda uma cópia do
+     * texto citado: o WhatsApp mostra a citação sempre atualizada, e uma cópia
+     * congelada divergiria da original no dia em que ela for editada ou
+     * apagada. O custo é um join a mais ao montar a conversa.
+     *
+     * `ON DELETE SET NULL`: apagar a mensagem citada não pode apagar a
+     * resposta junto — a resposta é fala de alguém, e continua existindo mesmo
+     * quando o que ela citava se foi.
+     */
+    replyToMessageId: uuid('reply_to_message_id'),
+
     status: messageStatusEnum('status').notNull().default('pendente'),
     /** Id da mensagem no provedor. Também deduplica o eco do próprio envio. */
     externalId: varchar('external_id', { length: 200 }),

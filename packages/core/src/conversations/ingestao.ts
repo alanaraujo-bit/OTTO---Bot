@@ -36,6 +36,15 @@ export interface MensagemRecebida {
   telefone?: string | null;
   /** Id da mensagem no provedor. É o que deduplica. */
   mensagemExterna: string;
+  /**
+   * Id da mensagem citada no provedor, quando o cliente respondeu uma delas.
+   *
+   * Pode apontar para algo que não está aqui — conversa que existia antes de o
+   * número ser conectado tem histórico que nunca passou por nós. Nesse caso a
+   * mensagem entra sem citação: perder a citação é aceitável, perder a
+   * mensagem do cliente não é.
+   */
+  respondendoExterno?: string | null;
   texto: string | null;
   tipo?: 'texto' | 'imagem' | 'audio' | 'video' | 'documento' | 'localizacao' | 'contato' | 'figurinha' | 'nao_suportado';
   anexos?: unknown[];
@@ -103,6 +112,29 @@ export async function receberMensagem(entrada: MensagemRecebida): Promise<Result
     // ── Mensagem ────────────────────────────────────────────────────────────
     const agora = entrada.enviadaEm ?? new Date();
 
+    // A citação é resolvida contra o que temos; não achar não interrompe nada.
+    //
+    // Presa a **esta** conversa, e não só à empresa. O WhatsApp mostra ao
+    // cliente um fio único e contínuo, então ele pode citar uma mensagem que
+    // aqui dentro ficou numa conversa anterior — e a citação apontaria para
+    // fora do histórico que a tela carrega. O bloco citado apareceria clicável
+    // e não levaria a lugar nenhum. Sem citação é melhor que citação morta.
+    let respondendoId: string | null = null;
+    if (entrada.respondendoExterno) {
+      const [citada] = await tx
+        .select({ id: messages.id })
+        .from(messages)
+        .where(
+          and(
+            eq(messages.tenantId, entrada.tenantId),
+            eq(messages.conversationId, conversationId),
+            eq(messages.externalId, entrada.respondendoExterno),
+          ),
+        )
+        .limit(1);
+      respondendoId = citada?.id ?? null;
+    }
+
     // A verificação acima resolve a entrega repetida no caso comum. Esta captura
     // resolve a corrida: dois webhooks do mesmo evento chegando ao mesmo tempo,
     // ambos passando pela verificação antes de qualquer um inserir. Sem isto, o
@@ -119,6 +151,7 @@ export async function receberMensagem(entrada: MensagemRecebida): Promise<Result
           contentType: entrada.tipo ?? 'texto',
           body: entrada.texto,
           attachments: entrada.anexos ?? [],
+          replyToMessageId: respondendoId,
           status: 'entregue',
           externalId: entrada.mensagemExterna,
           deliveredAt: agora,

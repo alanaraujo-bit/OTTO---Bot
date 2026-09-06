@@ -1,4 +1,5 @@
 import {
+  and,
   conversationEvents,
   conversations,
   eq,
@@ -119,11 +120,29 @@ export async function responderComoOperador(
   userId: string,
   texto: string,
   chaveIdempotencia: string,
+  respondendoA?: string | null,
 ): Promise<{ mensagemId: string; duplicada: boolean }> {
   const corpo = texto.trim();
   if (!corpo) throw conflito('A mensagem está vazia.');
 
   const resultado = await withTenant(tenantId, async (tx) => {
+    // A citação precisa ser desta conversa, e não apenas desta empresa.
+    //
+    // O identificador chega do navegador. A RLS já impede citar a mensagem de
+    // outra empresa, mas dentro da mesma empresa nada impediria citar a
+    // conversa de outro cliente — e o trecho citado apareceria para quem não
+    // tem nada a ver com ele. O WhatsApp recusaria o `wamid` de outra conversa,
+    // então o vazamento seria aqui dentro, na tela de quem atende.
+    if (respondendoA) {
+      const [citada] = await tx
+        .select({ id: messages.id })
+        .from(messages)
+        .where(and(eq(messages.id, respondendoA), eq(messages.conversationId, conversationId)))
+        .limit(1);
+
+      if (!citada) throw conflito('A mensagem citada não é desta conversa.');
+    }
+
     let mensagemId: string;
 
     try {
@@ -138,6 +157,7 @@ export async function responderComoOperador(
           contentType: 'texto',
           body: corpo,
           status: 'pendente',
+          replyToMessageId: respondendoA ?? null,
           idempotencyKey: chaveIdempotencia,
         })
         .returning({ id: messages.id });

@@ -6,6 +6,7 @@ import {
   conversations,
   desc,
   eq,
+  inArray,
   messages,
   or,
   sql,
@@ -151,6 +152,24 @@ export interface MensagemDaConversa {
   status: string;
   criadaEm: Date;
   falha: string | null;
+  /**
+   * O trecho citado, quando esta mensagem responde outra.
+   *
+   * Resolvido no servidor. A alternativa seria mandar só o identificador e
+   * deixar a interface procurar a original entre as mensagens que ela tem —
+   * que funciona até a citada ser mais antiga que a janela carregada, e aí a
+   * citação some sem explicação bem na conversa longa, que é justamente onde
+   * responder uma mensagem específica mais importa.
+   */
+  respondendoA: MensagemCitada | null;
+}
+
+/** Uma mensagem como ela aparece citada dentro de outra. */
+export interface MensagemCitada {
+  id: string;
+  autor: string;
+  autorNome: string | null;
+  corpo: string | null;
 }
 
 export interface DetalheConversa {
@@ -205,12 +224,43 @@ export async function detalharConversa(
         status: messages.status,
         criadaEm: messages.createdAt,
         falha: messages.failureReason,
+        respondendoAId: messages.replyToMessageId,
       })
       .from(messages)
       .leftJoin(users, eq(users.id, messages.authorUserId))
       .where(eq(messages.conversationId, conversationId))
       .orderBy(asc(messages.createdAt))
       .limit(200);
+
+    // ── Citações ──────────────────────────────────────────────────────────
+    // Quase toda citada já está no histórico carregado; só as que ficaram fora
+    // da janela de 200 custam uma consulta, e ela é uma só para todas.
+    const citadas = new Map<string, MensagemCitada>(
+      historico.map((m) => [m.id, { id: m.id, autor: m.autor, autorNome: m.autorNome, corpo: m.corpo }]),
+    );
+
+    const faltando = [
+      ...new Set(
+        historico
+          .map((m) => m.respondendoAId)
+          .filter((id): id is string => Boolean(id) && !citadas.has(id!)),
+      ),
+    ];
+
+    if (faltando.length) {
+      const antigas = await tx
+        .select({
+          id: messages.id,
+          autor: messages.author,
+          autorNome: users.name,
+          corpo: messages.body,
+        })
+        .from(messages)
+        .leftJoin(users, eq(users.id, messages.authorUserId))
+        .where(inArray(messages.id, faltando));
+
+      for (const m of antigas) citadas.set(m.id, m);
+    }
 
     return {
       id: conversa.id,
@@ -228,7 +278,12 @@ export async function detalharConversa(
           ? { id: conversa.atribuidaId, nome: conversa.atribuidaNome }
           : null,
       iaPausadaAte: conversa.iaPausadaAte,
-      mensagens: historico,
+      mensagens: historico.map(({ respondendoAId, ...m }) => ({
+        ...m,
+        // Nulo aqui pode significar duas coisas — não cita nada, ou cita algo
+        // que já não existe. As duas se resolvem igual na tela: sem citação.
+        respondendoA: respondendoAId ? (citadas.get(respondendoAId) ?? null) : null,
+      })),
     };
   });
 }

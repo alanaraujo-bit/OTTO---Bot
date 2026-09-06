@@ -21,6 +21,7 @@ export {
   type FiltrosInbox,
   type FiltroStatus,
   type ItemInbox,
+  type MensagemCitada,
   type MensagemDaConversa,
 } from './consultas.ts';
 

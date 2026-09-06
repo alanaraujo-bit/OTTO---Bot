@@ -81,6 +81,7 @@ export async function acaoResponder(
   conversaId: string,
   texto: string,
   chaveIdempotencia: string,
+  respondendoA?: string | null,
 ): Promise<Resultado> {
   return executar(empresaSlug, 'conversa.responder', async (acesso) => {
     const { mensagemId, duplicada } = await responderComoOperador(
@@ -89,6 +90,7 @@ export async function acaoResponder(
       acesso.sessao.usuario.id,
       texto,
       chaveIdempotencia,
+      respondendoA,
     );
 
     // Sem isto a resposta do operador ficava gravada e **nunca saía**: a
