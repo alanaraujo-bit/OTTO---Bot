@@ -85,9 +85,31 @@ Mais espaço acima de um título do que abaixo dele.
 44–48 px no toque. O desktop aproveita a densidade que uma tela grande permite; o
 celular respeita o dedo. Não é a mesma tela esticada.
 
-**Profundidade quase não existe.** Separação vem de linha e de superfície, não de
-sombra. Sombra só onde algo realmente flutua — menu, sheet, diálogo — e sempre
-com deslocamento vertical e desfoque suave, nunca halo colorido.
+**Profundidade vem de luz sobre material, nunca de brilho.** Esta é a distinção
+que decide tudo aqui. Uma superfície é um objeto sob uma fonte de luz difusa
+vinda de cima, e é assim que ela ganha espessura: a borda é branco com alfa no
+escuro — aresta que pega luz, não contorno desenhado; uma linha especular de
+1 px atravessa o topo do painel, forte no meio e ausente nos cantos, porque é
+assim que luz de cima se comporta numa quina real; o chão tem grão, que é o que
+impede uma tela escura de ler como retângulo chapado. A sombra tem deslocamento
+vertical porque o objeto está acima do fundo, não em volta dele.
+
+O que continua proibido, e a distância entre as duas coisas é a régua: halo
+colorido, aura da marca atrás do conteúdo, gradiente como enfeite, vidro
+desfocado sem função. Luz ambiente da página é acromática — é a lâmpada do
+teto, não uma assinatura de produto de IA.
+
+**O que sobe e o que afunda.** Painel sobe: borda iluminada e sombra externa.
+Campo afunda: preenchimento mais escuro que a superfície que o contém e sombra
+interna só no topo, onde a borda de um recorte real faria sombra. O contraste
+entre os dois dá espessura à tela sem uma única sombra externa a mais.
+
+**A ação primária tem preenchimento próprio.** A cor de marca clara do tema
+escuro existe para texto, foco e navegação ativa, onde precisa saltar do
+grafite; espalhada por um botão de largura inteira ela vira a coisa mais alta da
+tela. O preenchimento sólido é um verde-petróleo fundo nos dois temas — mesma
+cor percebida, mesmo peso — e escurece ao ser pressionado, com a aresta de cima
+acesa e um pixel de curso, como uma tecla.
 
 **Borda de destaque é de 1 px.** Faixa colorida grossa na lateral de card é
 recurso de template; a cor entra pela etiqueta e pelo texto.
@@ -97,9 +119,20 @@ recurso de template; a cor entra pela etiqueta e pelo texto.
 Um gesto por interação, com propósito, e nenhum ornamental.
 
 Durações: 120 ms para retorno de controle (hover, foco, pressionar), 180 ms para
-troca de estado, 240 ms para entrada de camada (sheet, diálogo, menu). Curva de
-saída exponencial a partir de um estado já visível — nada aparece de lugar
-nenhum com atraso encadeado.
+troca de estado, 240 ms para entrada de camada (sheet, diálogo, menu), 420 ms
+para uma tela assentando na carga. Curva de saída exponencial a partir de um
+estado já visível — nada aparece de lugar nenhum com atraso encadeado.
+
+Duas curvas, e cada uma tem trabalho. A de saída para camada que entra; uma
+curva de mola, que desacelera com um resto de inércia em vez de travar, só para
+superfície que assenta na carga. Controle nunca usa mola: um botão que balança
+ao receber o mouse é brinquedo.
+
+**Entrada é um objeto assentando, não uma animação por seção.** Uma tela entra
+com um gesto só, tocado por poucas peças em sequência curta, na ordem em que se
+lê, escalonadas por dezenas de milissegundos — não centenas. Sobe alguns pixels
+e recua de fração de escala. Nunca uma entrada idêntica repetida em cada bloco
+da página.
 
 O que ganha movimento: camadas que entram, mensagem nova chegando na conversa,
 valor que muda ao vivo, transição entre telas no celular. O que não ganha:

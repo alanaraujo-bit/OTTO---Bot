@@ -376,7 +376,7 @@ function PainelAgora({
           className={`inline-flex items-center gap-1.5 rounded-sm px-3.5 text-sm font-medium transition-colors max-md:min-h-11 md:h-9 ${
             calmo
               ? 'border-linha-firme text-texto hover:bg-superficie-2 border'
-              : 'bg-marca text-marca-contraste hover:bg-marca-forte'
+              : 'bg-solida text-solida-contraste hover:bg-solida-forte'
           }`}
         >
           {calmo

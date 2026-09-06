@@ -6,7 +6,7 @@
   Sem esta linha, toda classe usada dentro de `@otto/ui` é silenciosamente
   descartada da folha final: o componente existe, renderiza e não tem estilo.
 */
-@source "./";
+@source './';
 
 /*
   Sistema visual do produto.
@@ -25,9 +25,9 @@
   font-weight: 400 600;
   font-display: swap;
   src: url('/fontes/plex-sans-latin.woff2') format('woff2');
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
-    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
-    U+2212, U+2215, U+FEFF, U+FFFD;
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
 /* Um peso só: o mono aparece em identificador, custo e latência — dado que se
@@ -82,6 +82,9 @@
 
   --ease-saida: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-padrao: cubic-bezier(0.4, 0, 0.2, 1);
+  /* Desaceleração com um resto de inércia — o objeto assenta em vez de parar
+     seco. Só em entrada de superfície, nunca em retorno de controle. */
+  --ease-mola: cubic-bezier(0.32, 0.72, 0.24, 1);
 
   /* Durações nomeadas pelo que a coisa faz, não pelo número. Retorno de
      controle é quase instantâneo; camada que entra tem tempo de ser vista. */
@@ -111,6 +114,9 @@
   --cor-marca-forte: #14504a;
   --cor-marca-suave: #e4efec;
   --cor-marca-contraste: #ffffff;
+  --cor-solida: #1a5f58;
+  --cor-solida-forte: #14504a;
+  --cor-solida-contraste: #ffffff;
 
   --cor-ok: #1a6340;
   --cor-ok-suave: #e3f0e8;
@@ -121,6 +127,29 @@
 
   --cor-foco: #1a5f58;
   --cor-selecao: #cfe4e0;
+
+  /* Avatar de contato: só o matiz varia por pessoa. Claridade e croma ficam
+     aqui para que todos tenham o mesmo peso e o mesmo contraste. */
+  --avatar-fundo: 0.93 0.032;
+  --avatar-tinta: 0.44 0.085;
+
+  --conversa-pergunta: 0.055;
+  --conversa-resposta: 0.14;
+  --conversa-acesa: 0.4;
+
+  /* Material — como a luz encosta na superfície. No claro a luz já é o papel,
+     então a aresta é uma sombra fina, não um brilho. */
+  --cor-borda-luz: rgb(28 24 18 / 0.14);
+  --luz-aresta: transparent;
+  --luz-ambiente: rgb(28 24 18 / 0.06);
+  --forca-grao: 0.028;
+  --luz-controle: rgb(255 255 255 / 0.16);
+
+  /* Campo é encaixe, não bloco levantado: no papel é o branco mais limpo,
+     cercado por linha um pouco mais firme que a das superfícies. */
+  --cor-campo: #ffffff;
+  --cor-campo-borda: rgb(28 24 18 / 0.16);
+  --sombra-recesso: inset 0 1px 2px rgb(28 24 18 / 0.06);
 }
 
 /* ─── Tema escuro — grafite quente com luz ────────────────────────────────── */
@@ -146,6 +175,9 @@
   --cor-marca-forte: #78c6bc;
   --cor-marca-suave: #17302d;
   --cor-marca-contraste: #0d1f1d;
+  --cor-solida: #2a736b;
+  --cor-solida-forte: #24645d;
+  --cor-solida-contraste: #ffffff;
 
   --cor-ok: #56b783;
   --cor-ok-suave: #152a1f;
@@ -156,6 +188,26 @@
 
   --cor-foco: #78c6bc;
   --cor-selecao: #24443f;
+
+  --avatar-fundo: 0.29 0.038;
+  --avatar-tinta: 0.82 0.075;
+
+  --conversa-pergunta: 0.045;
+  --conversa-resposta: 0.085;
+  --conversa-acesa: 0.3;
+  /* No grafite a aresta de cima é especular: a luz vem de cima e para nela.
+     Branco com alfa, nunca cor — halo colorido é decoração, e está vetado. */
+  --cor-borda-luz: rgb(255 255 255 / 0.11);
+  --luz-aresta: rgb(255 255 255 / 0.22);
+  --luz-ambiente: rgb(255 255 255 / 0.055);
+  --forca-grao: 0.05;
+  --luz-controle: rgb(255 255 255 / 0.14);
+
+  /* Campo afunda: mais escuro que a superfície que o contém, com sombra
+     interna no topo. É o oposto do cartão, que sobe. */
+  --cor-campo: #100f0e;
+  --cor-campo-borda: rgb(255 255 255 / 0.1);
+  --sombra-recesso: inset 0 1px 0 rgb(0 0 0 / 0.4);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -178,6 +230,9 @@
     --cor-marca-forte: #78c6bc;
     --cor-marca-suave: #17302d;
     --cor-marca-contraste: #0d1f1d;
+    --cor-solida: #2a736b;
+    --cor-solida-forte: #24645d;
+    --cor-solida-contraste: #ffffff;
 
     --cor-ok: #56b783;
     --cor-ok-suave: #152a1f;
@@ -188,6 +243,27 @@
 
     --cor-foco: #78c6bc;
     --cor-selecao: #24443f;
+
+    --avatar-fundo: 0.29 0.038;
+    --avatar-tinta: 0.82 0.075;
+
+    --conversa-pergunta: 0.045;
+    --conversa-resposta: 0.085;
+    --conversa-acesa: 0.3;
+
+    /* No grafite a aresta de cima é especular: a luz vem de cima e para nela.
+       Branco com alfa, nunca cor — halo colorido é decoração, e está vetado. */
+    --cor-borda-luz: rgb(255 255 255 / 0.11);
+    --luz-aresta: rgb(255 255 255 / 0.22);
+    --luz-ambiente: rgb(255 255 255 / 0.055);
+    --forca-grao: 0.05;
+    --luz-controle: rgb(255 255 255 / 0.14);
+
+    /* Campo afunda: mais escuro que a superfície que o contém, com sombra
+       interna no topo. É o oposto do cartão, que sobe. */
+    --cor-campo: #100f0e;
+    --cor-campo-borda: rgb(255 255 255 / 0.1);
+    --sombra-recesso: inset 0 1px 0 rgb(0 0 0 / 0.4);
   }
 }
 
@@ -206,6 +282,9 @@
   --color-marca-forte: var(--cor-marca-forte);
   --color-marca-suave: var(--cor-marca-suave);
   --color-marca-contraste: var(--cor-marca-contraste);
+  --color-solida: var(--cor-solida);
+  --color-solida-forte: var(--cor-solida-forte);
+  --color-solida-contraste: var(--cor-solida-contraste);
   --color-ok: var(--cor-ok);
   --color-ok-suave: var(--cor-ok-suave);
   --color-atencao: var(--cor-atencao);
@@ -213,6 +292,9 @@
   --color-falha: var(--cor-falha);
   --color-falha-suave: var(--cor-falha-suave);
   --color-foco: var(--cor-foco);
+  --color-borda-luz: var(--cor-borda-luz);
+  --color-campo: var(--cor-campo);
+  --color-campo-borda: var(--cor-campo-borda);
 }
 
 /* ─── Base ────────────────────────────────────────────────────────────────── */
@@ -362,6 +444,469 @@
   }
 }
 
+/* ─── Demonstração viva da entrada ───────────────────────────────────────── */
+
+/*
+  Um ciclo único de 13 segundos encena a operação sem usar JavaScript: a
+  mensagem chega, três decisões ficam visíveis em sequência e a resposta segura
+  aparece. Todas as peças compartilham o mesmo relógio, por isso nunca saem de
+  sincronia depois de muitas repetições.
+*/
+@layer utilities {
+  .demonstracao-otto {
+    isolation: isolate;
+  }
+
+  .demo-cenario {
+    will-change: opacity;
+  }
+
+  .demo-cenario-1 {
+    animation: demo-cenario-1 26s var(--ease-saida) infinite both;
+  }
+
+  .demo-cenario-2 {
+    opacity: 0;
+    visibility: hidden;
+    animation: demo-cenario-2 26s var(--ease-saida) infinite both;
+  }
+
+  .demo-turno-1 {
+    animation: demo-turno-1 13s var(--ease-saida) infinite both;
+  }
+
+  .demo-turno-2 {
+    animation: demo-turno-2 13s var(--ease-saida) infinite both;
+  }
+
+  .demo-turno-3 {
+    animation: demo-turno-3 13s var(--ease-saida) infinite both;
+  }
+
+  .demo-turno-4,
+  .demo-decisao {
+    animation: demo-turno-4 13s var(--ease-saida) infinite both;
+  }
+
+  .demo-passo-1 {
+    animation: demo-passo-1 13s var(--ease-saida) infinite both;
+  }
+
+  .demo-passo-2 {
+    animation: demo-passo-2 13s var(--ease-saida) infinite both;
+  }
+
+  .demo-passo-3 {
+    animation: demo-passo-3 13s var(--ease-saida) infinite both;
+  }
+
+  .demo-passo-4 {
+    animation: demo-passo-4 13s var(--ease-saida) infinite both;
+  }
+
+  .demo-check {
+    opacity: 0;
+    transform: scale(0.65);
+  }
+
+  .demo-passo-1 .demo-check {
+    animation: demo-check-1 13s var(--ease-saida) infinite both;
+  }
+
+  .demo-passo-2 .demo-check {
+    animation: demo-check-2 13s var(--ease-saida) infinite both;
+  }
+
+  .demo-passo-3 .demo-check {
+    animation: demo-check-3 13s var(--ease-saida) infinite both;
+  }
+
+  .demo-passo-4 .demo-check {
+    animation: demo-check-4 13s var(--ease-saida) infinite both;
+  }
+
+  .demo-ponto {
+    animation: pulso-ponto 900ms var(--ease-padrao) infinite;
+  }
+
+  .demo-progresso > span {
+    animation: demo-progresso 13s linear infinite both;
+  }
+
+  .demo-status::after {
+    content: '';
+    animation: demo-status 13s steps(1, end) infinite both;
+  }
+
+  @keyframes demo-cenario-1 {
+    0%,
+    46% {
+      opacity: 1;
+      visibility: visible;
+    }
+    49%,
+    96% {
+      opacity: 0;
+      visibility: hidden;
+    }
+    100% {
+      opacity: 1;
+      visibility: visible;
+    }
+  }
+
+  @keyframes demo-cenario-2 {
+    0%,
+    46% {
+      opacity: 0;
+      visibility: hidden;
+    }
+    50%,
+    96% {
+      opacity: 1;
+      visibility: visible;
+    }
+    100% {
+      opacity: 0;
+      visibility: hidden;
+    }
+  }
+
+  @keyframes demo-turno-1 {
+    0%,
+    2%,
+    100% {
+      opacity: 0;
+      transform: translateY(6px) scale(0.985);
+    }
+    7%,
+    92% {
+      opacity: 1;
+      transform: none;
+    }
+    97% {
+      opacity: 0;
+      transform: translateY(-2px);
+    }
+  }
+
+  @keyframes demo-turno-2 {
+    0%,
+    17%,
+    100% {
+      opacity: 0;
+      transform: translateY(6px) scale(0.985);
+    }
+    23%,
+    92% {
+      opacity: 1;
+      transform: none;
+    }
+    97% {
+      opacity: 0;
+      transform: translateY(-2px);
+    }
+  }
+
+  @keyframes demo-turno-3 {
+    0%,
+    37%,
+    100% {
+      opacity: 0;
+      transform: translateY(6px) scale(0.985);
+    }
+    43%,
+    92% {
+      opacity: 1;
+      transform: none;
+    }
+    97% {
+      opacity: 0;
+      transform: translateY(-2px);
+    }
+  }
+
+  @keyframes demo-turno-4 {
+    0%,
+    57%,
+    100% {
+      opacity: 0;
+      transform: translateY(6px) scale(0.985);
+    }
+    63%,
+    92% {
+      opacity: 1;
+      transform: none;
+    }
+    97% {
+      opacity: 0;
+      transform: translateY(-2px);
+    }
+  }
+
+  @keyframes demo-passo-1 {
+    0%,
+    11%,
+    100% {
+      opacity: 0.38;
+      background-color: transparent;
+      transform: translateX(-3px);
+    }
+    16%,
+    25% {
+      opacity: 1;
+      background-color: var(--cor-marca-suave);
+      transform: none;
+    }
+    29%,
+    92% {
+      opacity: 0.78;
+      background-color: transparent;
+      transform: none;
+    }
+  }
+
+  @keyframes demo-passo-2 {
+    0%,
+    24%,
+    100% {
+      opacity: 0.34;
+      background-color: transparent;
+      transform: translateX(-3px);
+    }
+    29%,
+    38% {
+      opacity: 1;
+      background-color: var(--cor-marca-suave);
+      transform: none;
+    }
+    42%,
+    92% {
+      opacity: 0.78;
+      background-color: transparent;
+      transform: none;
+    }
+  }
+
+  @keyframes demo-passo-3 {
+    0%,
+    37%,
+    100% {
+      opacity: 0.34;
+      background-color: transparent;
+      transform: translateX(-3px);
+    }
+    42%,
+    51% {
+      opacity: 1;
+      background-color: var(--cor-marca-suave);
+      transform: none;
+    }
+    55%,
+    92% {
+      opacity: 0.78;
+      background-color: transparent;
+      transform: none;
+    }
+  }
+
+  @keyframes demo-passo-4 {
+    0%,
+    50%,
+    100% {
+      opacity: 0.34;
+      background-color: transparent;
+      transform: translateX(-3px);
+    }
+    55%,
+    64% {
+      opacity: 1;
+      background-color: var(--cor-marca-suave);
+      transform: none;
+    }
+    68%,
+    92% {
+      opacity: 0.78;
+      background-color: transparent;
+      transform: none;
+    }
+  }
+
+  @keyframes demo-check-1 {
+    0%,
+    20% {
+      opacity: 0;
+      transform: scale(0.65);
+    }
+    25%,
+    94% {
+      opacity: 1;
+      transform: none;
+    }
+    100% {
+      opacity: 0;
+    }
+  }
+
+  @keyframes demo-check-2 {
+    0%,
+    33% {
+      opacity: 0;
+      transform: scale(0.65);
+    }
+    38%,
+    94% {
+      opacity: 1;
+      transform: none;
+    }
+    100% {
+      opacity: 0;
+    }
+  }
+
+  @keyframes demo-check-3 {
+    0%,
+    46% {
+      opacity: 0;
+      transform: scale(0.65);
+    }
+    51%,
+    94% {
+      opacity: 1;
+      transform: none;
+    }
+    100% {
+      opacity: 0;
+    }
+  }
+
+  @keyframes demo-check-4 {
+    0%,
+    59% {
+      opacity: 0;
+      transform: scale(0.65);
+    }
+    64%,
+    94% {
+      opacity: 1;
+      transform: none;
+    }
+    100% {
+      opacity: 0;
+    }
+  }
+
+  @keyframes demo-progresso {
+    0% {
+      opacity: 0;
+      transform: scaleX(0);
+    }
+    5% {
+      opacity: 1;
+    }
+    90% {
+      opacity: 1;
+      transform: scaleX(1);
+    }
+    97%,
+    100% {
+      opacity: 0;
+      transform: scaleX(1);
+    }
+  }
+
+  @keyframes demo-status {
+    0%,
+    14% {
+      content: 'CAPTANDO';
+    }
+    15%,
+    27% {
+      content: 'ENTENDENDO';
+    }
+    28%,
+    40% {
+      content: 'CONTEXTUALIZANDO';
+    }
+    41%,
+    56% {
+      content: 'CONSULTANDO';
+    }
+    57%,
+    100% {
+      content: 'RESPONDENDO';
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .demo-cenario,
+    .demo-turno,
+    .demo-decisao,
+    .demo-passo,
+    .demo-check,
+    .demo-ponto,
+    .demo-progresso > span,
+    .demo-status::after {
+      animation: none;
+      opacity: 1;
+      transform: none;
+    }
+
+    .demo-cenario-1 {
+      visibility: visible;
+    }
+
+    .demo-cenario-2 {
+      display: none;
+    }
+
+    .demo-status::after {
+      content: 'PRONTO';
+    }
+  }
+}
+
+/* O motor de cenários revela somente o evento novo; o histórico permanece
+   imóvel para que a conversa pareça continuar, em vez de reiniciar a cada fala. */
+@layer utilities {
+  @keyframes demo-cena-ativa {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @keyframes demo-evento-entra {
+    from {
+      opacity: 0;
+      transform: translateY(6px) scale(0.985);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  .demo-cena-ativa {
+    animation: demo-cena-ativa var(--dur-camada) var(--ease-saida) both;
+  }
+
+  .demo-evento-entra {
+    animation: demo-evento-entra 320ms var(--ease-saida) both;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .demo-cena-ativa,
+    .demo-evento-entra {
+      animation: none;
+    }
+  }
+}
+
 /*
   Região de rolagem própria, em vez de a página inteira rolar como site.
 
@@ -458,6 +1003,198 @@
     }
     30% {
       opacity: 1;
+    }
+  }
+}
+
+/* ─── Material ────────────────────────────────────────────────────────────── */
+
+/*
+  Painel — uma superfície que existe fisicamente, não um retângulo pintado.
+
+  Três coisas fazem isso, e nenhuma delas é sombra colorida: a borda é branco
+  com alfa (no escuro) em vez de cinza opaco, então lê como aresta que pega luz
+  e não como contorno desenhado; uma linha especular de 1 px atravessa o topo,
+  brilhante no meio e ausente nos cantos, que é como luz vinda de cima se
+  comporta numa quina real; e a sombra tem deslocamento vertical, porque o
+  painel está acima do fundo, não em volta dele.
+
+  Recolhe-se sozinho no tema claro: `--luz-aresta` vira sombra em vez de brilho,
+  e o especular praticamente some. Papel iluminado não tem quina espelhada.
+*/
+@utility painel {
+  position: relative;
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda-luz);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-camada);
+}
+
+.painel::before {
+  content: '';
+  position: absolute;
+  /* Recuado do canto: a luz nunca acerta a curva do raio de frente. */
+  inset-inline: 22%;
+  top: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--luz-aresta), transparent);
+  pointer-events: none;
+}
+
+/*
+  Luz ambiente da página — uma fonte difusa acima do conteúdo.
+
+  Acromática de propósito: é a lâmpada do teto, não uma aura da marca. Brilho
+  colorido atrás do conteúdo está na lista de proibições do cliente, e com
+  razão — é a assinatura visual do produto de IA genérico.
+*/
+@utility luz-de-cima {
+  background-image: radial-gradient(115% 65% at 50% -8%, var(--luz-ambiente), transparent 68%);
+}
+
+/* ─── Entrada em três tempos ──────────────────────────────────────────────── */
+
+/*
+  Um gesto só, tocado por três peças em sequência curta: a assinatura, o painel,
+  a nota de rodapé. Não é uma animação por seção — é um objeto assentando, e as
+  peças chegam na ordem em que se lê.
+
+  Sobe 10 px e recua de 0,985 com a curva de mola: a superfície desacelera com
+  um resto de inércia em vez de travar. Escala nesse tamanho não borra texto.
+*/
+@layer utilities {
+  @keyframes assenta {
+    from {
+      opacity: 0;
+      transform: translateY(10px) scale(0.985);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  .assenta {
+    animation: assenta 420ms var(--ease-mola) both;
+    animation-delay: var(--atraso, 0ms);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .assenta {
+      animation: none;
+    }
+  }
+}
+
+/* ─── Marca Otto ─────────────────────────────────────────────────────────── */
+
+/*
+  A assinatura é uma conversa entrando na fila: a caixa fica firme, enquanto
+  uma segunda mensagem ganha lugar dentro dela. O ciclo não representa áudio
+  nem carregamento; ele traduz a função central do produto em escala mínima.
+  Só `transform` e `opacity` mudam — importante no cabeçalho, que fica presente
+  em toda a navegação.
+*/
+@layer utilities {
+  .marca-caixa,
+  .marca-linha {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .marca-linha {
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+
+  .marca-fluida .marca-linha-chegando {
+    animation: mensagem-chega 4.8s var(--ease-saida) infinite both;
+  }
+
+  @keyframes mensagem-chega {
+    0%,
+    12% {
+      opacity: 0;
+      transform: translateY(3px);
+    }
+    28%,
+    76% {
+      opacity: 1;
+      transform: none;
+    }
+    90%,
+    100% {
+      opacity: 0;
+      transform: translateY(-1px);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .marca-fluida .marca-linha-chegando {
+      animation: none;
+      opacity: 1;
+      transform: none;
+    }
+  }
+}
+
+/*
+  Grão da superfície.
+
+  Uma tela escura sem textura lê como um retângulo preenchido; com um ruído
+  quase imperceptível ela lê como material. É ruído fractal em SVG inline —
+  nenhuma requisição, nenhuma imagem para versionar — fixo na viewport para não
+  deslizar quando algo rola por cima. Não é gradiente nem brilho: é a superfície
+  tendo grão, como papel e como grafite têm.
+*/
+@utility grao {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.95' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+  opacity: var(--forca-grao);
+}
+
+/* ─── Campo de conversa ───────────────────────────────────────────────────── */
+
+/*
+  Uma resposta saindo.
+
+  O único movimento da tela de acesso, e não é ornamento: é o evento central do
+  produto acontecendo. Uma barra do lado que responde acende e apaga, esparsa,
+  com ciclo longo e atraso próprio por barra — tráfego real tem intervalo, não
+  batida. Nada de pulsar: acende uma vez, demora a apagar, e some por muito
+  tempo.
+
+  Sem `transform` e sem `filter`: só opacidade, que o aparelho modesto do
+  interior do Pará compõe na GPU sem repintar nada.
+*/
+@layer utilities {
+  @keyframes resposta-sai {
+    0%,
+    86%,
+    100% {
+      opacity: var(--calma);
+    }
+    91%,
+    94% {
+      opacity: var(--acesa);
+    }
+  }
+
+  .resposta-sai {
+    animation: resposta-sai 17s var(--ease-saida) infinite both;
+    animation-delay: var(--atraso, 0s);
+  }
+
+  /*
+    Com movimento reduzido o campo continua inteiro e continua dizendo a mesma
+    coisa — pergunta neutra, resposta na cor da marca. Só o acender para.
+  */
+  @media (prefers-reduced-motion: reduce) {
+    .resposta-sai {
+      animation: none;
+      opacity: var(--calma);
     }
   }
 }

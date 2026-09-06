@@ -14,13 +14,32 @@ import { acaoEntrar, type EstadoEntrada } from './acoes.ts';
  * envio real da server action em vez de um cronômetro que pode dessincronizar.
  */
 
+/*
+  Os dois campos afundam no painel — fundo mais escuro que a superfície que os
+  contém e sombra interna só no topo, que é onde a borda de um recorte real faria
+  sombra. Escrito como constante porque os dois precisam ser idênticos: dois
+  encaixes com uma diferença de meio tom viram um defeito visível.
+*/
+const ENCAIXE =
+  'bg-campo border-campo-borda shadow-[var(--sombra-recesso)] hover:border-linha-firme ' +
+  'focus-visible:border-marca focus-visible:shadow-[var(--sombra-recesso)]';
+
 function BotaoEntrar() {
   const { pending } = useFormStatus();
 
   // Sem `disabled`: um botão apagado na tela de entrada parece quebrado. A
   // validação acontece na server action e volta como mensagem amigável.
   return (
-    <Botao type="submit" variante="primaria" larguraTotal carregando={pending} className="mt-1">
+    <Botao
+      type="submit"
+      variante="primaria"
+      tamanho="lg"
+      larguraTotal
+      carregando={pending}
+      // A aresta de cima acesa é a quina de uma tecla; um pixel de descida no
+      // clique é o curso dela. Nada além disso se move.
+      className="mt-3 shadow-[inset_0_1px_0_var(--luz-controle)] active:translate-y-px"
+    >
       {pending ? 'Entrando…' : 'Entrar'}
     </Botao>
   );
@@ -33,7 +52,7 @@ export function FormularioEntrada({ proximo }: { proximo?: string }) {
   const [verSenha, setVerSenha] = useState(false);
 
   return (
-    <form action={agir} noValidate className="grid gap-4">
+    <form action={agir} noValidate className="grid gap-3.5">
       {proximo && <input type="hidden" name="proximo" value={proximo} />}
 
       <Campo
@@ -48,6 +67,7 @@ export function FormularioEntrada({ proximo }: { proximo?: string }) {
         placeholder="voce@empresa.com.br"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
+        className={ENCAIXE}
       />
 
       <Campo
@@ -58,6 +78,7 @@ export function FormularioEntrada({ proximo }: { proximo?: string }) {
         autoComplete="current-password"
         value={senha}
         onChange={(e) => setSenha(e.target.value)}
+        className={ENCAIXE}
         acessorio={
           <Botao
             variante="sutil"

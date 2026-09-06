@@ -18,7 +18,7 @@ type Tamanho = 'sm' | 'md' | 'lg';
 
 const VARIANTES: Record<Variante, string> = {
   primaria:
-    'bg-marca text-marca-contraste hover:bg-marca-forte active:bg-marca-forte border border-transparent',
+    'bg-solida text-solida-contraste hover:bg-solida-forte active:bg-solida-forte border border-transparent',
   secundaria:
     'bg-superficie text-texto border border-linha-firme hover:bg-superficie-2 active:bg-superficie-3',
   sutil:
