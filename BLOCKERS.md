@@ -232,7 +232,7 @@ mensagem de cliente sequer.
 
 ---
 
-## B7 · Senha do acesso principal — RESOLVIDO em desenvolvimento, pendente em produção
+## B7 · Senha do acesso principal — RESOLVIDO em desenvolvimento e em produção
 
 Pedido: tornar `alanvitoraraujo1a@outlook.com` o acesso principal, com a senha
 `alan123`.
@@ -249,16 +249,34 @@ tela de Configurações mostrando "Alan Araújo · Proprietário"):
 - `alanvitoraraujo1a@outlook.com` · **`vento-nuvem-ancora-40`**
 - Papel `proprietario` na empresa `mercado-modelo`.
 
-**Falta em produção:** depende do B6. Quando o ambiente estiver no ar, rodar
-(a partir da raiz, com o `.env` de produção):
+**Feito em produção em 2026-09-08**, papel `proprietario` na empresa
+`aionixdev` — a única que existe lá. A senha foi escolhida pelo Alan e passou
+pela validação do produto (`esquemaSenha` e `senhaObvia`); ela **não fica
+registrada aqui**, porque este arquivo é versionado.
+
+O banco de produção só existe na rede privada da Railway — não há proxy TCP
+público, e o `.env` local aponta para outro banco. O caminho é rodar o script
+de dentro de um container que já alcança o banco:
 
 ```
-node --env-file=.env packages/db/src/criar-acesso.ts \
-  --email alanvitoraraujo1a@outlook.com --nome "Alan Araújo" --empresa <slug>
+railway ssh --service worker \
+  "npx tsx packages/db/src/criar-acesso.ts \
+     --email <email> --nome '<Nome>' --empresa aionixdev --papel proprietario"
 ```
 
-Sem `--senha` ele gera uma frase forte e a imprime uma única vez. O script é
-idempotente e serve para qualquer pessoa e papel.
+Sem `--senha` ele gera uma frase forte e a imprime uma única vez — é a opção
+preferida, porque uma senha que nunca foi digitada em um chat não vaza por ali.
+O script é idempotente e serve para qualquer pessoa e papel.
+
+Verificado chamando `entrar()` contra o banco de produção: devolveu `ok: true`.
+`web` e `worker` apontam para o mesmo Postgres (`postgres-nm6t`), então o login
+em https://otto.aionixdev.com usa exatamente esse registro.
+
+**Cuidado achado no caminho:** `provisionar.ts` afirma no próprio comentário que
+roda no arranque do worker, mas **não está ligado a lugar nenhum** — as
+variáveis `PROVISIONAR_*` existem em produção, vazias, e não teriam efeito nem
+se fossem preenchidas. Ou se liga a função ao boot, ou se apaga a promessa do
+comentário.
 
 **Ainda pendente e relacionado:** não existe fluxo de "esqueci a senha" (ver
 Menores). Enquanto não existir, trocar a senha do proprietário depende de rodar
